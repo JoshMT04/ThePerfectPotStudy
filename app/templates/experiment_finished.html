@@ -1,0 +1,97 @@
+{% extends "layout.html" %}
+{% block ExtraHead %}
+    <title>Experiment Finished</title>
+    <style>
+        .grid-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        .grid-item {
+            flex: 0 0 280px;
+            text-align: center;
+        }
+        .img-thumbnail {
+            width: 280px;
+            max-width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+            cursor: pointer;
+            border: 3px solid transparent;
+            border-radius: 8px;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .img-thumbnail:hover {
+            border-color: #007bff;
+            transform: scale(1.03);
+        }
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+    </style>
+{% endblock ExtraHead %}
+{% block content %}
+    <h2 class="text-center">{{ _('Please now select THE most beautiful vase from your 5 runs!') }}</h2>
+    {% if final_vases and final_vases|length > 0 %}
+        <div class="grid-container" id="vase-grid">
+            {% for name, image in final_vases.items() %}
+                <div class="grid-item">
+                    <img src="{{ image }}" alt="{{ name }}" class="img-thumbnail" onClick="selectFinalVase('{{ name }}')">
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-center">{{ _('No vases available for selection. Please try again later.') }}</p>
+    {% endif %}
+    <div class="loading" id="loading">
+        <img src="/static/loading_gifs/loading1.gif" alt="Loading...">
+    </div>
+{% endblock content %}
+{% block JavaScript %}
+    <script>
+        let selectedVaseElement = null;
+
+        function selectFinalVase(vaseName) {
+            if (selectedVaseElement) {
+                selectedVaseElement.style.border = '';
+            }
+            selectedVaseElement = event.target;
+            selectedVaseElement.style.border = '3px solid red';
+
+            const loadingElement = document.getElementById('loading');
+            loadingElement.style.display = 'block';
+
+            fetch('/final_vase_selection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ vaseName: vaseName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = '/goodbye';
+                } else {
+                    alert('{{ _("Error selecting final vase.") }}');
+                    loadingElement.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                loadingElement.style.display = 'none';
+            });
+        }
+    </script>
+{% endblock JavaScript %}

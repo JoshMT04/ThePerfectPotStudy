@@ -1,0 +1,145 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section center-content">
+    <h3>{{ _('Please provide <b>anonymous</b> demographic information') }}</h3>
+    <p>{{ _('This information will be used to analyse the results of the experiment.') }}</p>
+    <!-- Retrieve the form written in the metadata folder -->
+    <form method="post" action="{{ url_for('metadata.start_experiment') }}" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        {{ form.browser_language(id='browser_language') }}
+        {{ form.timezone(id='timezone') }}
+        {{ form.screen_width(id='screen_width') }}
+        {{ form.screen_height(id='screen_height') }}
+        {{ form.device_type(id='device_type') }}
+        <fieldset class="form-group">
+            <!-- Display the age integer form box and check for any errors - i.e. Have they filled it in and are they >18yrs old -->
+            <div class="form-group">
+                {{ form.age.label(class="form-control-label") }} {{ form.age(placeholder=_("Enter your age")) }}
+                <small class="form-text text-muted">
+                    {{ _("You must be 18 or older to take part in this study. If you prefer not to say, please enter 1000") }}
+                </small>
+                {% if form.age.errors %}
+                    <div>
+                        {% for error in form.age.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.gender.label(class="form-control-label") }} {{ form.gender() }}
+                {% if form.gender.errors %}
+                    <div>
+                        {% for error in form.gender.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.sexuality.label(class="form-control-label") }} {{ form.sexuality() }}
+                {% if form.sexuality.errors %}
+                    <div>
+                        {% for error in form.sexuality.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.current_residence_region.label(class="form-control-label") }} {{ form.current_residence_region() }}
+                <small class="form-text text-muted">
+                    {{ _("Please select one region only.") }}
+                </small>
+                {% if form.current_residence_region.errors %}
+                    <div>
+                        {% for error in form.current_residence_region.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.upbringing_region.label(class="form-control-label") }} {{ form.upbringing_region() }}
+                <small class="form-text text-muted">
+                    {{ _("Please select one region only. If you spent time in multiple regions, please select the one where you spent the most time.") }}
+                </small>
+                {% if form.upbringing_region.errors %}
+                    <div>
+                        {% for error in form.upbringing_region.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.disability.label(class="form-control-label") }} {{ form.disability(size=7) }}
+                <small class="form-text text-muted">
+                    {{ _("To select more than one option, hold down 'Ctrl' (Windows) or 'Cmd' (Mac) whilst selecting.") }}
+                </small>
+                {% if form.disability.errors %}
+                    <div>
+                        {% for error in form.disability.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.potter.label(class="form-control-label") }} {{ form.potter() }}
+                {% if form.potter.errors %}
+                    <div>
+                        {% for error in form.potter.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.consent.label(class="form-control-label") }} {{ form.consent() }}
+                <small class="form-text text-muted">
+                    {{ _('By checking this box you are consenting to the use of your data in this experiment and confirm that you have read and understood the participant information provided.') }}
+                </small>
+                {% if form.consent.errors %}
+                    <div>
+                        {% for error in form.consent.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </fieldset>
+        <div class="form-group">
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+</div>
+
+<script>
+    (function () {
+        function detectDeviceType() {
+            var w = window.innerWidth || screen.width || 0;
+            if (w <= 767) return 'mobile';
+            if (w <= 1024) return 'tablet';
+            return 'desktop';
+        }
+
+        var language = navigator.language || '';
+        var timezone = '';
+        try {
+            timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        } catch (e) {
+            timezone = '';
+        }
+
+        var width = window.screen && window.screen.width ? window.screen.width : '';
+        var height = window.screen && window.screen.height ? window.screen.height : '';
+
+        document.getElementById('browser_language').value = language;
+        document.getElementById('timezone').value = timezone;
+        document.getElementById('screen_width').value = width;
+        document.getElementById('screen_height').value = height;
+        document.getElementById('device_type').value = detectDeviceType();
+    })();
+</script>
+{% endblock content %}

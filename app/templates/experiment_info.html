@@ -1,0 +1,27 @@
+<!-- This is the experiment page that the user will see when they first visit the website
+It extends the page structure defined in layout.html and adds additional sections as part of 'blocks' -->
+{% extends "layout.html" %}
+{% block content %}
+    <div style="max-width: 760px; margin: 0 auto;">
+        <h3 class="text-center">{{ _('Help us find the <em>shape</em> of the <b>most beautiful</b> vase!') }}</h3>
+        <h4 class="text-center">{{ _('Play a game that will take a few minutes!') }}</h4>
+        <h5 class="mt-4">{{ _('To play:') }}</h5>
+        <ol style="line-height:180%">
+            <li>{{ _('Provide simple, anonymous information') }}</li>
+            <li>{{ _('You will be given a choice of 2 vases: select what <em>you</em> think is the <b>most beautiful</b> vase') }}</li>
+            <li>{{ _('Repeat this for 5 generations') }}</li>
+            <li>{{ _('Do this 4 more times giving a total of 5 runs') }}</li>
+            <li>{{ _('You will then see the <b>most beautiful</b> vase from each run: select the <b>most beautiful</b> of these') }}</li>
+            <li>{{ _('Please remember you will not like every vase you select, but we still want to know which one you find the most beautiful!') }}</li>
+        </ol>
+        <p>
+            <strong>{{ _('Please read the participant information before starting:') }}</strong>
+            <a href="{{ url_for('about_us.participant_information') }}">{{ _('Participant Information and Consent') }}</a>
+        </p>
+        <div class="text-center mt-4">
+            <a href="/start_experiment">
+                <button type="button" class="btn btn-info btn-lg px-5">{{ _('Start Experiment') }}</button>
+            </a>
+        </div>
+    </div>
+{% endblock content %}

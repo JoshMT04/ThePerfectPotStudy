@@ -1,0 +1,248 @@
+{% extends "layout.html" %}
+{% block ExtraHead %}
+    <title>{{ _('Vase Selection') }}</title>
+{% endblock ExtraHead %}
+{% block CSS %}
+    <style>
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            padding: 20px;
+            justify-items: center;
+            align-items: center;
+            max-width: 840px;
+            margin: 0 auto;
+        }
+        .grid-item {
+            text-align: center;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 8px;
+        }
+        .progress-bar {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0 4px;
+        }
+        .progress-bar-fill {
+            height: 20px;
+            background-color: #4caf50;
+            width: 0;
+            transition: width 0.5s;
+        }
+        .disabled {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        .img-thumbnail {
+            width: clamp(140px, 38vw, 370px) !important;
+            height: clamp(140px, 38vw, 370px) !important;
+            object-fit: contain;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .img-thumbnail:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+    </style>
+{% endblock CSS %}
+{% block content %}
+    <div style="max-width: 840px; margin: 0 auto;">
+        <h3 class="text-center">{{ _('Please select the <b>most beautiful</b> vase!') }}</h3>
+        <h5 id="current-run" class="text-center">{{ _('Current Run:') }} {{ play_counter }}</h5>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <small id="gen-label" class="text-muted">{{ _('Run') }} {{ play_counter }} {{ _('of') }} {{ num_reps }} &middot; {{ _('Generation') }} {{ current_gen + 1 }} {{ _('of') }} {{ max_gens }}</small>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+        </div>
+    </div>
+    <div class="grid-container" id="vase-grid">
+        {% for name, image in vase_id_dict.items() %}
+            <div class="grid-item">
+                <img src="{{image}}" alt="{{ name }}" class="img-thumbnail" onClick="selectVase('{{ name }}')">
+            </div>
+        {% endfor %}
+    </div>
+    <div class="loading" id="loading">
+        <img src="/static/loading_gifs/loading1.gif" alt="{{ _('Loading...') }}">
+    </div>
+{% endblock content %}
+{% block JavaScript %}
+    <script>
+        let selectedVase = null;
+        let isProcessing = false;
+        let trialStartPerfMs = performance.now();
+
+        function setTrialStartAfterImagesLoad() {
+            const images = Array.from(document.querySelectorAll('#vase-grid .img-thumbnail'));
+            if (images.length === 0) {
+                trialStartPerfMs = performance.now();
+                return;
+            }
+
+            const loaded = images.map((img) => {
+                if (img.complete) {
+                    return Promise.resolve();
+                }
+                return new Promise((resolve) => {
+                    img.addEventListener('load', resolve, { once: true });
+                    img.addEventListener('error', resolve, { once: true });
+                });
+            });
+
+            Promise.all(loaded).then(() => {
+                requestAnimationFrame(() => {
+                    trialStartPerfMs = performance.now();
+                });
+            });
+        }
+
+        function triggerPrefetch() {
+            fetch('/prefetch_vases', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({})
+            }).catch(err => console.log('Prefetch skipped:', err));
+        }
+
+        function updateVaseGrid(vase_id_dict) {
+            console.log('Updating vase grid with new images:', vase_id_dict);
+            const vaseGrid = document.getElementById('vase-grid');
+            vaseGrid.innerHTML = '';
+
+            const entries = Object.entries(vase_id_dict);
+            for (let i = entries.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [entries[i], entries[j]] = [entries[j], entries[i]];
+            }
+
+            for (const [name, image] of entries) {
+                const gridItem = document.createElement('div');
+                gridItem.className = 'grid-item';
+
+                const imgElement = document.createElement('img');
+                imgElement.src = image;
+                imgElement.alt = name;
+                imgElement.className = 'img-thumbnail';
+                imgElement.onclick = () => selectVase(name);
+
+                gridItem.appendChild(imgElement);
+                vaseGrid.appendChild(gridItem);
+            }
+            setTrialStartAfterImagesLoad();
+        }
+
+        function updateProgressBar(currentGen, maxGens) {
+            const progressBarFill = document.getElementById('progress-bar-fill');
+            const progressPercentage = (currentGen / maxGens) * 100;
+            progressBarFill.style.width = progressPercentage + '%';
+
+            const genLabel = document.getElementById('gen-label');
+            if (genLabel) {
+                genLabel.textContent = `{{ _('Run') }} {{ play_counter }} {{ _('of') }} {{ num_reps }} · {{ _('Generation') }} ${currentGen + 1} {{ _('of') }} ${maxGens}`;
+            }
+
+            const currentRunElement = document.getElementById('current-run');
+            const playCounter = {{ play_counter }};
+            currentRunElement.textContent = `{{ _('Current Run:') }} ${playCounter}`;
+        }
+
+        function selectVase(vaseName) {
+            if (isProcessing) {
+                console.log('Selection blocked - already processing');
+                return;
+            }
+
+            console.log(`Selecting vase: ${vaseName}`);
+            isProcessing = true;
+
+            if (selectedVase) {
+                selectedVase.style.border = 'none';
+            }
+            selectedVase = event.target;
+            selectedVase.style.border = '2px solid red';
+
+            const loadingElement = document.getElementById('loading');
+            loadingElement.style.display = 'block';
+
+            const decisionTime = Math.max(0, Math.round(performance.now() - trialStartPerfMs));
+
+            fetch('/select_vase', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ vaseName: vaseName, decisionTime: decisionTime })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                if (data.finished) {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                    window.location.href = '/experiment_finished';
+                } else {
+                    updateVaseGrid(data.vase_id_dict);
+                    updateProgressBar(data.current_gen, data.max_gens);
+                    isProcessing = false;
+                    loadingElement.style.display = 'none';
+                    triggerPrefetch();
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                alert('Error processing your selection. Please try again.');
+                isProcessing = false;
+                loadingElement.style.display = 'none';
+                if (selectedVase) {
+                    selectedVase.style.border = 'none';
+                    selectedVase = null;
+                }
+            });
+        }
+
+        function handleBeforeUnload(event) {
+            event.preventDefault();
+            event.returnValue = '{{ _("Are you sure you want to leave this page? Your progress may be lost.") }}';
+        }
+
+        window.addEventListener('DOMContentLoaded', function() {
+            setTrialStartAfterImagesLoad();
+            updateProgressBar({{ current_gen }}, {{ max_gens }});
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            triggerPrefetch();
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const includePreviousVase = {{ include_previous_vase | tojson }};
+            if (includePreviousVase) {
+                const vaseContainer = document.getElementById("vase-grid");
+                const vases = Array.from(vaseContainer.children);
+                vases.sort(() => Math.random() - 0.5);
+                vases.forEach(vase => vaseContainer.appendChild(vase));
+            }
+        });
+    </script>
+{% endblock JavaScript %}

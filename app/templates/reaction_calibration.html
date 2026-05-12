@@ -1,0 +1,370 @@
+{% extends "layout.html" %}
+{% block ExtraHead %}
+    <title>{{ _('Reaction Time Calibration') }}</title>
+{% endblock ExtraHead %}
+{% block CSS %}
+<style>
+    .calibration-wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        text-align: center;
+    }
+    .calibration-panel {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 24px;
+        margin-top: 20px;
+        background: #fafafa;
+    }
+    .stimulus-zone {
+        margin: 18px auto;
+        width: 260px;
+        height: 260px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .stimulus {
+        width: 180px;
+        height: 180px;
+        border-radius: 999px;
+        border: 2px solid #bbb;
+        background: #e0e0e0;
+        color: #555;
+        font-weight: 700;
+        cursor: not-allowed;
+        user-select: none;
+        touch-action: manipulation;
+    }
+    .stimulus.ready {
+        background: #2e7d32;
+        border-color: #1b5e20;
+        color: #fff;
+        cursor: pointer;
+    }
+    .trial-progress {
+        font-weight: 600;
+        margin-top: 6px;
+    }
+    .results {
+        margin-top: 18px;
+        text-align: left;
+        display: inline-block;
+        min-width: 320px;
+    }
+    .btn-row {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+    }
+    .status-note {
+        margin-top: 10px;
+        min-height: 24px;
+        font-size: 0.95rem;
+    }
+</style>
+{% endblock CSS %}
+{% block content %}
+<div class="calibration-wrap">
+    <h3>{{ _('Reaction Time Calibration') }}</h3>
+    <p>
+        {{ _('Before the vase task, we run a short calibration to estimate your device and interaction latency.') }}
+        {{ _('Tap/click the circle as soon as it turns green.') }}
+    </p>
+    <p>
+        {{ _('This takes about 20-30 seconds and helps improve comparability of reaction-time data across devices.') }}
+    </p>
+
+    <div class="calibration-panel">
+        <div id="instruction">{{ _('Press Start to begin calibration.') }}</div>
+        <div class="stimulus-zone">
+            <button id="stimulus" class="stimulus" type="button" disabled>{{ _('Wait') }}</button>
+        </div>
+        <div class="trial-progress" id="trial-progress">{{ _('Trial') }} 0 / 8</div>
+        <div class="status-note" id="status-note"></div>
+
+        <div class="results" id="results" style="display:none;"></div>
+
+        <div class="btn-row">
+            <button id="start-btn" class="btn btn-primary" type="button">{{ _('Start Calibration') }}</button>
+            <button id="save-btn" class="btn btn-success" type="button" disabled>{{ _('Continue to Vase Selection') }}</button>
+            <button id="skip-btn" class="btn btn-outline-secondary" type="button">{{ _('Skip Calibration') }}</button>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+{% block JavaScript %}
+<script>
+(function () {
+    const PRACTICE_TRIALS = 2;
+    const MEASURED_TRIALS = 8;
+    const MIN_WAIT_MS = 700;
+    const MAX_WAIT_MS = 1800;
+    const ANTICIPATION_CUTOFF_MS = 100;
+
+    const startBtn = document.getElementById('start-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const skipBtn = document.getElementById('skip-btn');
+    const stimulusBtn = document.getElementById('stimulus');
+    const instructionEl = document.getElementById('instruction');
+    const trialProgressEl = document.getElementById('trial-progress');
+    const statusNoteEl = document.getElementById('status-note');
+    const resultsEl = document.getElementById('results');
+
+    let isRunning = false;
+    let canRespond = false;
+    let currentTrial = 0;
+    let reactionStart = 0;
+    let timeoutId = null;
+    let measuredRTs = [];
+    let frameIntervalMs = null;
+    let timerResolutionMs = null;
+
+    function randomBetween(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function toFixedSafe(value) {
+        if (value === null || value === undefined || Number.isNaN(value)) {
+            return 'N/A';
+        }
+        return Number(value).toFixed(2);
+    }
+
+    function mean(values) {
+        if (!values.length) return null;
+        return values.reduce((sum, v) => sum + v, 0) / values.length;
+    }
+
+    function median(values) {
+        if (!values.length) return null;
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+            return (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+        return sorted[mid];
+    }
+
+    function mad(values, med) {
+        if (!values.length || med === null) return null;
+        const deviations = values.map((v) => Math.abs(v - med));
+        return median(deviations);
+    }
+
+    function estimateFrameInterval() {
+        return new Promise((resolve) => {
+            const stamps = [];
+            function step(ts) {
+                stamps.push(ts);
+                if (stamps.length < 120) {
+                    requestAnimationFrame(step);
+                    return;
+                }
+                const deltas = [];
+                for (let i = 1; i < stamps.length; i++) {
+                    deltas.push(stamps[i] - stamps[i - 1]);
+                }
+                resolve(median(deltas));
+            }
+            requestAnimationFrame(step);
+        });
+    }
+
+    function estimateTimerResolution() {
+        const deltas = [];
+        let prev = performance.now();
+        for (let i = 0; i < 1500; i++) {
+            const now = performance.now();
+            const delta = now - prev;
+            if (delta > 0) {
+                deltas.push(delta);
+                prev = now;
+            }
+        }
+        if (!deltas.length) return null;
+        return Math.min(...deltas);
+    }
+
+    function setStimulusWaiting() {
+        canRespond = false;
+        stimulusBtn.disabled = true;
+        stimulusBtn.classList.remove('ready');
+        stimulusBtn.textContent = '{{ _('Wait') }}';
+    }
+
+    function setStimulusReady() {
+        canRespond = true;
+        reactionStart = performance.now();
+        stimulusBtn.disabled = false;
+        stimulusBtn.classList.add('ready');
+        stimulusBtn.textContent = '{{ _('Tap Now') }}';
+    }
+
+    function updateTrialText() {
+        const measuredCount = Math.max(0, currentTrial - PRACTICE_TRIALS);
+        trialProgressEl.textContent = `{{ _('Trial') }} ${Math.min(measuredCount, MEASURED_TRIALS)} / ${MEASURED_TRIALS}`;
+    }
+
+    function scheduleStimulus() {
+        setStimulusWaiting();
+        instructionEl.textContent = '{{ _('Wait for green, then tap as fast as you can.') }}';
+        const waitMs = randomBetween(MIN_WAIT_MS, MAX_WAIT_MS);
+        timeoutId = window.setTimeout(setStimulusReady, waitMs);
+    }
+
+    function finishCalibration() {
+        isRunning = false;
+        setStimulusWaiting();
+        startBtn.disabled = false;
+        saveBtn.disabled = false;
+        skipBtn.disabled = false;
+
+        const med = median(measuredRTs);
+        const avg = mean(measuredRTs);
+        const madValue = mad(measuredRTs, med);
+
+        resultsEl.style.display = 'inline-block';
+        resultsEl.innerHTML = `
+            <div><strong>{{ _('Calibration complete') }}</strong></div>
+            <div>{{ _('Median reaction time') }}: ${toFixedSafe(med)} ms</div>
+            <div>{{ _('Mean reaction time') }}: ${toFixedSafe(avg)} ms</div>
+            <div>{{ _('Variability (MAD)') }}: ${toFixedSafe(madValue)} ms</div>
+            <div>{{ _('Estimated frame interval') }}: ${toFixedSafe(frameIntervalMs)} ms</div>
+            <div>{{ _('Estimated timer resolution') }}: ${toFixedSafe(timerResolutionMs)} ms</div>
+        `;
+
+        statusNoteEl.textContent = '{{ _('Calibration results are ready. Continue when you are ready.') }}';
+        instructionEl.textContent = '{{ _('Calibration finished.') }}';
+    }
+
+    function handleResponse() {
+        if (!isRunning || !canRespond) {
+            return;
+        }
+
+        const rt = Math.max(0, Math.round(performance.now() - reactionStart));
+        canRespond = false;
+        stimulusBtn.disabled = true;
+
+        if (rt < ANTICIPATION_CUTOFF_MS) {
+            statusNoteEl.textContent = '{{ _('That was too fast to be reliable. Trial repeated.') }}';
+            scheduleStimulus();
+            return;
+        }
+
+        currentTrial += 1;
+        if (currentTrial > PRACTICE_TRIALS) {
+            measuredRTs.push(rt);
+            statusNoteEl.textContent = `{{ _('Recorded') }}: ${rt} ms`;
+        } else {
+            statusNoteEl.textContent = '{{ _('Practice trial completed.') }}';
+        }
+
+        updateTrialText();
+
+        if (measuredRTs.length >= MEASURED_TRIALS) {
+            finishCalibration();
+            return;
+        }
+
+        scheduleStimulus();
+    }
+
+    async function startCalibration() {
+        if (isRunning) return;
+        isRunning = true;
+        canRespond = false;
+        currentTrial = 0;
+        measuredRTs = [];
+        resultsEl.style.display = 'none';
+        statusNoteEl.textContent = '';
+        saveBtn.disabled = true;
+        startBtn.disabled = true;
+        skipBtn.disabled = true;
+
+        instructionEl.textContent = '{{ _('Measuring device timing characteristics...') }}';
+        frameIntervalMs = await estimateFrameInterval();
+        timerResolutionMs = estimateTimerResolution();
+
+        instructionEl.textContent = '{{ _('Calibration started. Wait for green and tap quickly.') }}';
+        updateTrialText();
+        scheduleStimulus();
+    }
+
+    function postCalibration(payload, endpoint) {
+        return fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(payload)
+        }).then((response) => response.json());
+    }
+
+    saveBtn.addEventListener('click', function () {
+        saveBtn.disabled = true;
+        statusNoteEl.textContent = '{{ _('Saving calibration...') }}';
+
+        const med = median(measuredRTs);
+        const avg = mean(measuredRTs);
+        const madValue = mad(measuredRTs, med);
+
+        const payload = {
+            calibration_version: 'rt-cal-v1',
+            trials_ms: measuredRTs,
+            median_rt_ms: med !== null ? Math.round(med) : null,
+            mean_rt_ms: avg !== null ? Math.round(avg) : null,
+            mad_rt_ms: madValue !== null ? Math.round(madValue) : null,
+            frame_interval_ms: frameIntervalMs !== null ? Number(frameIntervalMs.toFixed(3)) : null,
+            timer_resolution_ms: timerResolutionMs !== null ? Number(timerResolutionMs.toFixed(6)) : null,
+            hardware_concurrency: navigator.hardwareConcurrency || null,
+            device_memory_gb: navigator.deviceMemory || null,
+            platform: navigator.platform || null
+        };
+
+        postCalibration(payload, '/save_reaction_calibration')
+            .then((data) => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Calibration save failed.');
+                }
+                window.location.href = data.next_url;
+            })
+            .catch((error) => {
+                console.error(error);
+                statusNoteEl.textContent = '{{ _('Unable to save calibration. Please try again.') }}';
+                saveBtn.disabled = false;
+            });
+    });
+
+    skipBtn.addEventListener('click', function () {
+        if (!confirm('{{ _('Skip calibration and continue?') }}')) {
+            return;
+        }
+
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+
+        postCalibration({}, '/skip_reaction_calibration')
+            .then((data) => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Skip failed.');
+                }
+                window.location.href = data.next_url;
+            })
+            .catch((error) => {
+                console.error(error);
+                statusNoteEl.textContent = '{{ _('Unable to skip calibration right now. Please try again.') }}';
+            });
+    });
+
+    startBtn.addEventListener('click', startCalibration);
+    stimulusBtn.addEventListener('click', handleResponse);
+})();
+</script>
+{% endblock JavaScript %}

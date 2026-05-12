@@ -1,0 +1,153 @@
+<!-- This is the goodbye page that the user will see when they complete the experiment
+It extends the page structure defined in layout.html and adds additional sections as part of 'blocks' -->
+{% extends "layout.html" %}
+{% block CSS %}
+<style>
+    .img-thumbnail {
+        width: 300px;
+        height: auto;
+    }
+    .loading {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+    }
+</style>
+{% endblock CSS %}
+{% block ExtraHead %}
+    <title>Goodbye</title>
+{% endblock ExtraHead %}
+
+{% block content %}
+    <div style="max-width: 760px; margin: 0 auto;">
+        <h2>{{ _('Thank you for participating in our experiment!') }}</h2>
+        <h4>{{ _('Please play the game only once!') }}</h4>
+        <p>{{ _('We appreciate your time. Have a great day!') }}</p>
+        {% if final_vase_image %}
+            <h3>{{ _('Your Final Selected Vase:') }}</h3>
+            <img src="{{ final_vase_image }}" alt="{{ _('Final Selected Vase') }}" class="img-thumbnail">
+            <br>
+            <a href="{{ final_vase_image }}" download="Final_Selected_Vase.png" class="btn btn-primary mt-2">{{ _('Download Vase') }}</a>
+        {% endif %}
+
+        <!-- Error Report Form Section -->
+        <div class="mt-5 p-4 border rounded">
+            <h3>{{ _('Tell us if you think you know the hypothesis of the experiment:') }}</h3>
+            <form method="POST" action="{{ url_for('vase.goodbye') }}">
+                {{ form.hidden_tag() }}
+
+                <div class="form-group mb-3">
+                    {{ form.hypothesis.label(class="form-label") }}
+                    <div class="mt-2">
+                        {% for subfield in form.hypothesis %}
+                            <div class="form-check">
+                                {{ subfield(class="form-check-input") }}
+                                {{ subfield.label(class="form-check-label") }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% if form.hypothesis.errors %}
+                        <div class="text-danger">
+                            {% for error in form.hypothesis.errors %}
+                                <small>{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group mb-3" id="hyp-text-group" style="display: none;">
+                    {{ form.hyp_text.label(class="form-label") }}
+                    {{ form.hyp_text(class="form-control", rows="3") }}
+                    {% if form.hyp_text.errors %}
+                        <div class="text-danger">
+                            {% for error in form.hyp_text.errors %}
+                                <small>{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+            <h4>{{ _('Feedback (Optional)') }}</h4>
+            <p>{{ _('If you experienced any technical issues during the experiment, please let us know below. This helps us improve the experience for future participants.') }}</p>
+
+                <div class="form-group mb-3">
+                    <div class="form-check">
+                        {{ form.report(class="form-check-input") }}
+                        {{ form.report.label(class="form-check-label") }}
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    {{ form.issue.label(class="form-label") }}
+                    <div class="mt-2">
+                        {% for subfield in form.issue %}
+                            <div class="form-check">
+                                {{ subfield(class="form-check-input") }}
+                                {{ subfield.label(class="form-check-label") }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% if form.issue.errors %}
+                        <div class="text-danger">
+                            {% for error in form.issue.errors %}
+                                <small>{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group mb-3">
+                    {{ form.other_issue.label(class="form-label") }}
+                    {{ form.other_issue(class="form-control", rows="3", placeholder=_("Please provide details about the issue you experienced...")) }}
+                    {% if form.other_issue.errors %}
+                        <div class="text-danger">
+                            {% for error in form.other_issue.errors %}
+                                <small>{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    {{ form.submit(class="btn btn-secondary btn-sm", id="submit-btn") }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">
+        <img src="/static/loading_gifs/loading1.gif" alt="{{ _('Loading...') }}">
+    </div>
+{% endblock content %}
+
+{% block JavaScript %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const hypothesisRadios = document.querySelectorAll('input[name="hypothesis"]');
+            const hypTextGroup = document.getElementById('hyp-text-group');
+
+            function toggleHypText() {
+                const selected = document.querySelector('input[name="hypothesis"]:checked');
+                hypTextGroup.style.display = (selected && selected.value === 'yes') ? 'block' : 'none';
+            }
+
+            hypothesisRadios.forEach(radio => radio.addEventListener('change', toggleHypText));
+            toggleHypText();
+
+            const form = document.querySelector('form');
+            const loadingElement = document.getElementById('loading');
+            const submitBtn = document.getElementById('submit-btn');
+
+            if (form) {
+                form.addEventListener('submit', function(event) {
+                    loadingElement.style.display = 'block';
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '{{ _("Submitting...") }}';
+                });
+            }
+        });
+    </script>
+{% endblock JavaScript %}

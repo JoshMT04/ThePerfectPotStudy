@@ -1,0 +1,63 @@
+body {
+    background:#dedce3; /* Sets the background color of the body to a light grey */
+    color: #000000; /* Sets the text color to black */
+    margin-top: 5rem; /* Adds a top margin of 5 rem units */
+    font-family: 'Roboto', sans-serif; /* Sets the font family to 'Roboto' */
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #444444; /* Sets the text color of all header elements to a dark grey */
+    font-family: 'Roboto', sans-serif; /* Sets the font family to 'Roboto' */
+}
+
+.bg-steel {
+    background-color: #1b6d7a; /* Sets the background color to a steel blue */
+}
+
+.site-header .navbar-nav .nav-link {
+    color: #ffffff; /* Sets the text color of navigation links in the site header to white */
+}
+
+.site-header .navbar-nav .nav-link:hover {
+    color: #58575d; /* Changes the text color to a dark grey when hovered over */
+}
+
+.site-header .navbar-nav .nav-link.active {
+    font-weight: 500; /* Makes the font weight of active navigation links bolder */
+}
+
+.content-section {
+    background: #ffffff; /* Sets the background color to white */
+    padding: 10px 20px; /* Adds padding inside the element */
+    border: 1px solid #dddddd; /* Adds a light grey border */
+    border-radius: 3px; /* Rounds the corners of the border */
+    margin-bottom: 20px; /* Adds a bottom margin */
+}
+
+.sidebar-navbar {
+    position: fixed; /* Fixes the position of the sidebar */
+    top: 100; /* Sets the top position */
+    right: 0; /* Aligns the sidebar to the right */
+    height: 15%; /* Sets the height of the sidebar */
+    width: 200px; /* Sets the width of the sidebar */
+    background-color: #2fb8cd; /* Sets the background color to a shade of blue */
+    display: flex; /* Uses flexbox layout */
+    flex-direction: column; /* Arranges children in a column */
+    align-items: center; /* Centers children horizontally */
+    padding-top: 20px; /* Adds padding to the top */
+}
+
+.sidebar-navbar a {
+    padding: 15px 20px; /* Adds padding inside the links */
+    text-align: center; /* Centers the text */
+    text-decoration: none; /* Removes the underline from the text */
+    font-size: 18px; /* Sets the font size */
+    color: white; /* Sets the text color to white */
+    width: 100%; /* Makes the links take up the full width */
+    display: block; /* Makes the links block elements */
+    transition: background-color 0.3s; /* Adds a transition effect for background color */
+}
+
+.sidebar-navbar a:hover {
+    background-color: #575757; /* Changes the background color to dark grey when hovered over */
+}
