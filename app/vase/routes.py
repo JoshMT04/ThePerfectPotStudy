@@ -17,7 +17,7 @@ vaseBP = Blueprint('vase', __name__)
 
 MaxGens = 5  # Set the number of generations for the experiment
 gen_list = list(range(1, MaxGens + 1))  # Create a list with the number of generations (e.g. 1 - 10)
-PCs = [f"PC{i}" for i in range(1, 6)]  # Create a list with PC1 - PC5
+PCs = [f"PC{i}" for i in range(1, 7)]  # Create a list with PC1 - PC6
 vases_per_gen = 2  # Set the number of vases to be selected from per generation
 num_vase_points = 250  # Number of contour points in the full vase silhouette
 
