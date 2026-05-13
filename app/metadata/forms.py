@@ -11,11 +11,11 @@ regions = [
 ]
 
 # Create a list of all disability options
-disablities = [
-    ('prefer_not_to_say', _l('Prefer not to say')), ('none', _l('None')), ('physical', _l('Physical')),
-    ('mental_health', _l('Mental Health Condition')), ('learning', _l('Learning Difference (e.g.Dyslexia/Dyspraxia/ADHD)')),
-    ('autism', _l("Autism, ASD, or Asperger's Syndrome")), ('developmental', _l('Developmental Disability (e.g. Down Syndrome)')),
-]
+# disablities = [
+#     ('prefer_not_to_say', _l('Prefer not to say')), ('none', _l('None')), ('physical', _l('Physical')),
+#     ('mental_health', _l('Mental Health Condition')), ('learning', _l('Learning Difference (e.g.Dyslexia/Dyspraxia/ADHD)')),
+#     ('autism', _l("Autism, ASD, or Asperger's Syndrome")), ('developmental', _l('Developmental Disability (e.g. Down Syndrome)')),
+# ]
 
 # Create a form for the user to input their information
 class UserInfoForm(FlaskForm):
@@ -29,7 +29,7 @@ class UserInfoForm(FlaskForm):
         ('other', _l('Other')), ('prefer_not_to_say', _l('Prefer not to say'))
         ], validators=[DataRequired()])
 
-    sexuality = SelectField(_l('Sexual Orientation'), choices=[ # Create a dropdown menu for the user to input their sexuality
+    sexuality = SelectField(_l('Sexual Orientation'), choices=[
         ('', _l('Select Sexuality')), ('heterosexual', _l('Heterosexual or straight')), ('homosexual', _l('Gay or Lesbian')), ('bisexual', _l('Bisexual')),
         ('other', _l('Other')), ('prefer_not_to_say', _l('Prefer not to say')),
     ], validators=[DataRequired()])
@@ -37,7 +37,7 @@ class UserInfoForm(FlaskForm):
     current_residence_region = SelectField(_l('Where do you currently live?'), choices=[('', _l('Select one region'))] + regions, validators=[DataRequired()])
     upbringing_region = SelectField(_l('Where did you grow up?'), choices=[('', _l('Select one region'))] + regions, validators=[DataRequired()])
 
-    disability = SelectMultipleField(_l('Do you identify as having a disability?'), choices=disablities, validators=[DataRequired()])
+    # disability = SelectMultipleField(_l('Do you identify as having a disability?'), choices=disablities, validators=[DataRequired()])
 
     potter = SelectField(_l('Do you have any experience with pottery?'), choices=[ # Create a dropdown menu for the user to input their potter status
         ('', _l('Select Pottery Experience')), ('amateur', _l('Amateur')), ('professional', _l('Professional')),
@@ -62,9 +62,9 @@ class UserInfoForm(FlaskForm):
     def validate_upbringing_region(form, field):
         form.validate_region(field)
 
-    def validate_disability(form, field):
-        if not field.data:
-            raise ValidationError(_l("Please select at least one option."))
+    # def validate_disability(form, field):
+    #     if not field.data:
+    #         raise ValidationError(_l("Please select at least one option."))
 
     def validate_gender(form, field):
         if not field.data:

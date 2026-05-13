@@ -72,7 +72,7 @@
                     </div>
                 {% endif %}
             </div>
-            <div class="form-group">
+            {# <div class="form-group">
                 {{ form.disability.label(class="form-control-label") }} {{ form.disability(size=7) }}
                 <small class="form-text text-muted">
                     {{ _("To select more than one option, hold down 'Ctrl' (Windows) or 'Cmd' (Mac) whilst selecting.") }}
@@ -84,7 +84,7 @@
                         {% endfor %}
                     </div>
                 {% endif %}
-            </div>
+            </div> #}
             <div class="form-group">
                 {{ form.potter.label(class="form-control-label") }} {{ form.potter() }}
                 {% if form.potter.errors %}

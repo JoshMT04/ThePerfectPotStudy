@@ -118,7 +118,7 @@ def start_experiment():
         form.current_residence_region.data = ''
         form.upbringing_region.data = ''
         form.sexuality.data = ''
-        form.disability.data = []
+        # form.disability.data = []
         form.consent.data = ''
         form.potter.data = ''
         
@@ -139,7 +139,7 @@ def start_experiment():
         session['age'] = form.age.data
         session['gender'] = form.gender.data
         session['sexuality'] = form.sexuality.data
-        session['disability'] = form.disability.data
+        # session['disability'] = form.disability.data
         session['potter'] = form.potter.data
 
         # Preferred normalized keys for analysis/export.
@@ -148,7 +148,7 @@ def start_experiment():
         session['sexual_orientation'] = form.sexuality.data
         session['current_residence_region_code'] = form.current_residence_region.data
         session['upbringing_region_code'] = form.upbringing_region.data
-        session['disability_identity_codes'] = form.disability.data
+        # session['disability_identity_codes'] = form.disability.data
         session['pottery_experience_level'] = form.potter.data
 
         # Store client/session context for downstream analysis.
