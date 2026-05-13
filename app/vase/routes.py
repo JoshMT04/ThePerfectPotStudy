@@ -98,6 +98,19 @@ def vase_selection():
         for i in range(1, num_reps + 1):
             session.pop(f'round_{i}_uploaded', None)
 
+    # Detect page refresh: page was already rendered but no selection has been made since.
+    # gen_track > 0 guards against treating a fresh round start as a refresh.
+    if session.get('vase_page_rendered') and gen_track > 0 and session.get('vase_id_dict'):
+        flash('Refreshing the page does not count as a selection — your progress has not changed. Please select a vase to continue.', 'warning')
+        return render_template(
+            'vase_selection.html',
+            vase_id_dict=session['vase_id_dict'],
+            current_gen=gen_track - 1,
+            max_gens=MaxGens,
+            include_previous_vase=include_previous_vase,
+            play_counter=play_counter + 1
+        )
+
     max_generation_attempts = 3
     vases = None
     pc_vases_dict = None
@@ -134,6 +147,7 @@ def vase_selection():
         session['elapsed_times'] = []
 
     session['pc_global_dict'] = make_json_safe(pc_global_dict)
+    session['vase_page_rendered'] = True
 
     return render_template(
         'vase_selection.html',
@@ -271,6 +285,7 @@ def select_vase():
     session['gen_track'] = gen_track
     session['start_time'] = time.time()
     session['processing_vase'] = False
+    session['vase_page_rendered'] = False
 
     return jsonify(finished=False, vase_id_dict=vase_id_dict, current_gen=gen_track-1, max_gens=MaxGens)
 
