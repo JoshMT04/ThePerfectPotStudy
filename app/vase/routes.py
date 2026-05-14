@@ -28,12 +28,17 @@ include_previous_vase = True # Flag to include the previous vase in the next gen
 _upload_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix='drive-upload')
 
 def _upload_async(file_content, filename, folder_id):
-    """Submit a Drive upload to the thread pool. Errors are logged automatically."""
+    """Submit a Drive upload to the thread pool with one retry on failure."""
     def _do_upload():
-        try:
-            upload_file(file_content, filename, folder_id)
-        except Exception as e:
-            logging.error(f"Async upload failed for {filename}: {e}")
+        for attempt in range(2):
+            try:
+                upload_file(file_content, filename, folder_id)
+                return
+            except Exception as e:
+                if attempt == 0:
+                    logging.warning(f"Upload attempt 1 failed for {filename}: {e} — retrying")
+                else:
+                    logging.error(f"Upload failed permanently for {filename}: {e}")
     _upload_pool.submit(_do_upload)
 
 def _csv_scalar(value):

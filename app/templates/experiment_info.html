@@ -8,14 +8,15 @@ It extends the page structure defined in layout.html and adds additional section
         <h5 class="mt-4">{{ _('To play:') }}</h5>
         <ol style="line-height:180%">
             <li>{{ _('Provide simple, anonymous information') }}</li>
-            <li>{{ _('You will be given a choice of 2 vases: select what <em>you</em> think is the <b>most beautiful</b> vase') }}</li>
+            <li>{{ _('You will be given a choice of 2 vases: select which <em>you</em> think is the <b>more beautiful</b> vase') }}</li>
             <li>{{ _('Repeat this for 5 generations') }}</li>
             <li>{{ _('Do this 4 more times giving a total of 5 runs') }}</li>
             <li>{{ _('You will then see the <b>most beautiful</b> vase from each run: select the <b>most beautiful</b> of these') }}</li>
-            <li>{{ _('Please remember <b>you may not like every vase you select</b>, but we still want to know which one you find the most beautiful!') }}</li>
+            <li>{{ _('Please remember <b>you may not like every vase you select</b>, but we still want to know which one you find <em>more beautiful!</em>') }}</li>
         </ol>
         <p>
-            <strong>{{ _('Please read the participant information before starting:') }}</strong>
+            <strong>{{ _('Please read the participant information before starting. 
+                By continuing to the experiment and ticking the consent box you acknowledge you have read and understood the participant information:') }}</strong>
             <a href="{{ url_for('about_us.participant_information') }}">{{ _('Participant Information and Consent') }}</a>
         </p>
         <div class="text-center mt-4">
