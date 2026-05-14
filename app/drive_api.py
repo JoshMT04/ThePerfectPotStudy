@@ -1,9 +1,10 @@
 
-
 from google.oauth2.service_account import Credentials
+from google.auth.transport.httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from io import BytesIO
+import httplib2
 import logging
 import os
 import json
@@ -11,6 +12,9 @@ import threading
 
 # Define the scope for Google Drive API allowing to create files
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
+
+# Timeout in seconds for Drive API requests (default httplib2 is 60s — too short for large XY files)
+_DRIVE_TIMEOUT_S = 300
 
 # Cached Drive service per thread (googleapiclient is not thread-safe)
 _thread_local = threading.local()
@@ -25,7 +29,8 @@ def _get_service():
         else:
             creds = Credentials.from_service_account_file(
                 r'app/service_account.json', scopes=SCOPES)
-        _thread_local.service = build('drive', 'v3', credentials=creds)
+        authorized_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=_DRIVE_TIMEOUT_S))
+        _thread_local.service = build('drive', 'v3', http=authorized_http)
     return _thread_local.service
 
 def upload_file(file_content, filename, folder_id):
