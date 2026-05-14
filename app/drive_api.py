@@ -1,10 +1,8 @@
 
 from google.oauth2.service_account import Credentials
-from google.auth.transport.httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from io import BytesIO
-import httplib2
 import logging
 import os
 import json
@@ -29,8 +27,13 @@ def _get_service():
         else:
             creds = Credentials.from_service_account_file(
                 r'app/service_account.json', scopes=SCOPES)
-        authorized_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=_DRIVE_TIMEOUT_S))
-        _thread_local.service = build('drive', 'v3', http=authorized_http)
+        service = build('drive', 'v3', credentials=creds)
+        # Increase timeout on the underlying httplib2 connection (default 60s is too short for large XY files)
+        try:
+            service._http.http.timeout = _DRIVE_TIMEOUT_S
+        except AttributeError:
+            logging.warning("Could not set Drive API timeout — large uploads may time out")
+        _thread_local.service = service
     return _thread_local.service
 
 def upload_file(file_content, filename, folder_id):
