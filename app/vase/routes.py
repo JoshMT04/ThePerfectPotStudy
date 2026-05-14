@@ -420,6 +420,8 @@ def experiment_finished():
 
     writer_xy = csv.DictWriter(csv_buffer_xy, fieldnames=fieldnames_xy)
     writer_xy.writeheader()
+    xy_rows_written = 0
+    xy_vases_skipped = 0
     for gen, vases in round_pc_data.items():
         elapsed_time = vases[2]
         decision_time_ms = vases[3] if len(vases) > 3 else None
@@ -428,9 +430,12 @@ def experiment_finished():
         gen_num = int(gen.split('_gen_')[-1])
         is_first_gen = (gen_num == 1)
         for vase_name, vase_data in vases[0].items():
-
-            # Apply standardisation directly; interpolation fundamentally removed
-            x_vals, y_vals = get_standardised_xy(vase_data['PCs'])
+            try:
+                x_vals, y_vals = get_standardised_xy(vase_data['PCs'])
+            except Exception as e:
+                logging.error(f"get_standardised_xy failed for {vase_name} in {gen} (user {user_id}): {e}")
+                xy_vases_skipped += 1
+                continue
 
             for x, y in zip(x_vals, y_vals):
                 writer_xy.writerow({
@@ -456,11 +461,18 @@ def experiment_finished():
                     'session_duration_s': session_duration_s,
                     'completion_status': completion_status
                 })
+                xy_rows_written += 1
+
+    if xy_vases_skipped:
+        logging.warning(f"XY export for user {user_id} round {play_counter}: {xy_vases_skipped} vase(s) skipped due to errors, {xy_rows_written} rows written.")
 
     xy_folder_id = os.getenv('XY_DRIVE_FOLDER_ID')
     if xy_folder_id:
-        _upload_async(csv_buffer_xy.getvalue(), f'round_{play_counter}_{user_id}_xy.csv', xy_folder_id)
-        print(f"XY CSV upload submitted for round {play_counter}")
+        if xy_rows_written > 0:
+            _upload_async(csv_buffer_xy.getvalue(), f'round_{play_counter}_{user_id}_xy.csv', xy_folder_id)
+            print(f"XY CSV upload submitted for round {play_counter} ({xy_rows_written} rows)")
+        else:
+            logging.error(f"XY CSV has no rows for user {user_id} round {play_counter} — upload skipped.")
     else:
         logging.error("XY_DRIVE_FOLDER_ID environment variable is not set.")
 
