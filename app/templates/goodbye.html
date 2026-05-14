@@ -35,6 +35,9 @@ It extends the page structure defined in layout.html and adds additional section
 
         <!-- Error Report Form Section -->
         <div class="mt-5 p-4 border rounded">
+            {% if goodbye_submitted %}
+                <p class="text-muted">{{ _('Your feedback has been recorded.') }}</p>
+            {% else %}
             <h3>{{ _('Tell us if you think you know the hypothesis of the experiment:') }}</h3>
             <form method="POST" action="{{ url_for('vase.goodbye') }}">
                 {{ form.hidden_tag() }}
@@ -115,6 +118,7 @@ It extends the page structure defined in layout.html and adds additional section
                     {{ form.submit(class="btn btn-secondary btn-sm", id="submit-btn") }}
                 </div>
             </form>
+            {% endif %}
         </div>
     </div>
 

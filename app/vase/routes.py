@@ -568,7 +568,9 @@ def goodbye():
             logging.error("ERROR_DRIVE_FOLDER_ID environment variable is not set.")
 
         flash('Thank you for your feedback!', 'info')
+        session['goodbye_submitted'] = True
 
         return redirect(url_for('vase.goodbye'))
 
-    return render_template('goodbye.html', final_vase_image=final_vase_image, form=form)
+    goodbye_submitted = session.get('goodbye_submitted', False)
+    return render_template('goodbye.html', final_vase_image=final_vase_image, form=form, goodbye_submitted=goodbye_submitted)
