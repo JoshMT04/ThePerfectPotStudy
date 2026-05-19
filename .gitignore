@@ -1,0 +1,17 @@
+.DS_store
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.bak
+real_vase_data/
+*.parquet
+*.csv
+feature_extraction/outdir/legacy_master_feature_matrix_purged.csv
+feature_extraction/outdir/pairwise_xgb_within_round_vase_delta_matrix.csv
+feature_extraction/outdir/xgb_rank_items_within_round.csv
+feature_extraction/outdir/master_feature_matrix_compiled.parquet
