@@ -352,13 +352,15 @@ def experiment_finished():
     }
 
     if not round_pc_data:
+        if 'user_id' not in session:
+            return redirect(url_for('metadata.start_experiment'))
         logging.error(
             f"No generation rows found for {round_prefix}. "
             f"Available keys: {list(pc_global_dict.keys())}. "
             f"CSV export aborted for round {play_counter}."
         )
-        session[upload_key] = False
-        return redirect(url_for('vase.experiment_finished'))
+        session[upload_key] = True
+        return redirect(url_for('vase.goodbye'))
 
     csv_buffer = StringIO()
     fieldnames = ['generation_key', 'vase', 'pc_name', 'pc_value', 'is_selected_vase',

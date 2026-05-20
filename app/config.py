@@ -43,6 +43,6 @@ class Config:
     # Flask-Caching config — pool capped separately to stay within Redis connection limit
     CACHE_TYPE = 'redis'
     CACHE_REDIS_URL = redis_url
-    CACHE_OPTIONS = {'max_connections': 2}
+    CACHE_OPTIONS = {'max_connections': 4}
 
     LANGUAGES = ['en', 'fr', 'zh', 'ja', 'it', 'es', 'pt']
