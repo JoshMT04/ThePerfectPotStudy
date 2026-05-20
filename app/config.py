@@ -18,14 +18,16 @@ class Config:
         sep = '&' if '?' in redis_url else '?'
         redis_url = f"{redis_url}{sep}ssl_cert_reqs=none"
 
-    # Single Redis connection
+    # 8 dynos x 4 workers = 32 processes; Premium 2 cap is 250 connections.
+    # Session pool: 32 x 4 = 128, Cache pool: 32 x 3 = 96, total = 224 — within limit.
     redis_connection = redis.from_url(
         redis_url,
-        max_connections=20,
+        max_connections=4,
         retry_on_timeout=True,
         socket_keepalive=True,
         socket_keepalive_options={},
-        health_check_interval=30
+        health_check_interval=30,
+        socket_connect_timeout=5,
     )
 
     # Flask-Session config
@@ -38,8 +40,9 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SECURE = True if os.environ.get('ENVIRONMENT') == 'production' else False
 
-    # Flask-Caching config
+    # Flask-Caching config — pool capped separately to stay within Redis connection limit
     CACHE_TYPE = 'redis'
     CACHE_REDIS_URL = redis_url
+    CACHE_OPTIONS = {'max_connections': 3}
 
     LANGUAGES = ['en', 'fr', 'zh', 'ja', 'it', 'es', 'pt']

@@ -167,9 +167,14 @@ def vase_selection():
 def select_vase():
     user_processing = session.get('processing_vase', False)
     if user_processing:
-        return jsonify(error="A vase is already being processed. Please wait.")
+        # Clear the flag if it has been stuck for more than 15 seconds (e.g. from a failed session save)
+        if time.time() - session.get('processing_since', 0) > 15:
+            session['processing_vase'] = False
+        else:
+            return jsonify(error="A vase is already being processed. Please wait.")
 
     session['processing_vase'] = True
+    session['processing_since'] = time.time()
     pc_global_dict = session.get('pc_global_dict', {})
 
     data = request.get_json()

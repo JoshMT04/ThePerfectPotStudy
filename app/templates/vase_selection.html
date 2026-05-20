@@ -200,6 +200,13 @@
             .then(response => response.json())
             .then(data => {
                 console.log('Success:', data);
+                if (data.error) {
+                    console.warn('Server error:', data.error);
+                    isProcessing = false;
+                    loadingElement.style.display = 'none';
+                    if (selectedVase) { selectedVase.style.border = 'none'; selectedVase = null; }
+                    return;
+                }
                 if (data.finished) {
                     window.removeEventListener('beforeunload', handleBeforeUnload);
                     window.location.href = '/experiment_finished';
