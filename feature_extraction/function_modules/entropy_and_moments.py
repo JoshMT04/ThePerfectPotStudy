@@ -1,12 +1,71 @@
 '''
 Python file for computing Complexity & Entropy and Statistical Moments features.
-This module translates the spatial coordinates into information-theoretic vocabularies, 
+This module translates the spatial coordinates into information-theoretic vocabularies,
 spectral frequencies, and thermodynamic entropy to measure the structural unpredictability of the vase.
-It should be noted that curvature arrays are converted into a ternary alphabet (Convex, Flat, Concave) to 
-compute the Lempel-Ziv complexity, which quantifies the number of unique sub-patterns in the curvature profile, 
-reflecting the vase's structural intricacy and design variability.
+Curvature arrays are converted into a ternary alphabet (Convex, Flat, Concave) to compute Lempel-Ziv
+complexity, which quantifies the number of unique sub-patterns in the curvature profile. This includes:
+- Curvature Shannon Entropy
+    - Curvature Shannon Entropy is calculated by binning the curvature distribution into a 20-bin histogram
+      and computing the Shannon entropy of the resulting probability mass. It measures the informational
+      unpredictability of the bending pattern, with higher values indicating more varied curvature.
+- Approximate Entropy
+    - Approximate Entropy (ApEn) measures the logarithmic likelihood that similar windows of curvature
+      values remain similar at the next step, using a template length of 2 and a tolerance of 0.2 standard
+      deviations. It quantifies the regularity and predictability of the curvature sequence.
+- Gzip Complexity Ratio
+    - Gzip Complexity Ratio is calculated by compressing the normalised, quantised X-coordinate array with
+      GZIP at maximum level and dividing the compressed byte size by the original byte size. It approximates
+      the Kolmogorov complexity of the profile shape, with values closer to 1 indicating higher structural
+      complexity.
+- Gzip Compressed Size
+    - Gzip Compressed Size is the raw byte length of the GZIP-compressed normalised X-coordinate array.
+      It provides an absolute measure of the algorithmic information content of the profile independent of
+      the original array length.
+- Lempel Ziv Complexity
+    - Lempel-Ziv Complexity counts the number of distinct non-repeating sub-patterns in the ternary curvature
+      sequence (Concave=0, Flat=1, Convex=2) using the LZ76 algorithm. It measures the structural intricacy
+      and design variability of the vase's bending profile.
+- Fractal Dimension
+    - Fractal Dimension is estimated via 1D box-counting on the normalised (x, y) profile curve across ten
+      logarithmically spaced grid scales, fitting a log-log regression to extract the scaling exponent.
+      Values above 1 indicate a curve that fills space more than a straight line.
+- Low Freq Fft Energy
+    - Low Freq Fft Energy is the sum of squared magnitudes of the 1st through 3rd harmonics of the centroid
+      distance signature's FFT. It captures the energy concentrated in large, global macro-shape oscillations.
+- High Freq Fft Energy
+    - High Freq Fft Energy is the sum of squared magnitudes of the highest 15 frequency bins of the centroid
+      distance signature's FFT. It captures the energy in microscopic, high-frequency surface noise or detail.
+- Low Order Fourier Magnitude
+    - Low Order Fourier Magnitude is the sum of the FFT magnitudes at the 2nd and 3rd harmonics of the
+      centroid distance signature. It measures the contribution of the dominant periodic shape components
+      beyond the fundamental frequency.
+- Contour Autocorrelation Decay
+    - Contour Autocorrelation Decay records the lag index at which the normalised curvature autocorrelation
+      first drops below 0.5. It measures how quickly the vase "forgets" its current bending state, with
+      lower values indicating a rapidly changing, less self-similar curvature profile.
+- Contour Tortuosity
+    - Contour Tortuosity is calculated as (perimeter / Euclidean end-to-end distance) - 1. It measures how
+      much longer the actual contour path is compared to a straight line between its endpoints, quantifying
+      the overall windiness of the profile.
+- Hu Moment 1 through Hu Moment 7
+    - The seven Hu Moments are computed from the OpenCV moments of the full mirrored symmetric contour and
+      log-transformed as -sign(val) * log10(|val|) to prevent floating-point underflow. Each moment is
+      invariant to scale, rotation, and translation, together encoding the global spatial mass distribution
+      of the vase shape.
+- Curvature Skewness
+    - Curvature Skewness is the third standardised moment of the curvature distribution. It measures whether
+      the bending is asymmetrically concentrated towards convex or concave regions, with positive values
+      indicating a tail of sharp convex peaks.
+- Zernike Moment Amplitude
+    - Zernike Moment Amplitude is the absolute magnitude of the Z(2,2) Zernike moment computed by projecting
+      the rasterised symmetric vase shape onto a unit disk. It measures the degree of structural elongation
+      and directional orientation of the shape's mass distribution.
+- Zernike Moment Phase
+    - Zernike Moment Phase is the complex argument (angle) of the Z(2,2) Zernike moment. It encodes the
+      dominant axis of elongation of the vase shape within the unit disk projection.
 '''
 
+import gzip
 import numpy as np
 import cv2
 from scipy.stats import entropy, skew
@@ -71,7 +130,17 @@ def extract_entropy_and_moments(base):
     # 2. Approximate Entropy (ApEn)
     f['approximate_entropy'] = _approximate_entropy(k)
     
-    # 3. Lempel-Ziv Complexity
+    # 3. GZIP Kolmogorov Complexity Estimate
+    # Normalise x to [0, 1] first so the measure captures structural complexity
+    # rather than scale. Quantise to uint16 (65536 levels) to match the precision
+    # used in the original R implementation (gzip on a numeric vector).
+    x_norm = (x - x.min()) / (x.max() - x.min() + 1e-8)
+    x_bytes = (x_norm * 65535).astype(np.uint16).tobytes()
+    compressed = gzip.compress(x_bytes, compresslevel=9)
+    f['gzip_complexity_ratio'] = len(compressed) / len(x_bytes)
+    f['gzip_compressed_size']  = len(compressed)
+
+    # 4. Lempel-Ziv Complexity
     # Discretise curvature into a Ternary Alphabet (Concave, Flat, Convex)
     noise_threshold = 1e-3
     ternary_k = np.zeros_like(k, dtype=int)
@@ -80,7 +149,7 @@ def extract_entropy_and_moments(base):
     ternary_k[(k >= -noise_threshold) & (k <= noise_threshold)] = 1 # Flat
     f['lempel_ziv_complexity'] = _lempel_ziv_complexity(ternary_k)
     
-    # 4. Fractal Dimension (1D Box-Counting on the profile curve)
+    # 5. Fractal Dimension (1D Box-Counting on the profile curve)
     # We normalise the x and y axes to ensure the grid scales symmetrically
     x_norm = (x - np.min(x)) / (np.max(x) - np.min(x) + 1e-8)
     y_norm = (y - np.min(y)) / (np.max(y) - np.min(y) + 1e-8)
@@ -96,7 +165,7 @@ def extract_entropy_and_moments(base):
     coeffs = np.polyfit(np.log(1/epsilons), np.log(counts), 1)
     f['fractal_dimension'] = coeffs[0]
     
-    # 5. Spectral FFT Analysis (Frequency Domain)
+    # 6. Spectral FFT Analysis (Frequency Domain)
     # Convert 2D coordinates into a 1D Centroid Distance Signature
     cx, cy = np.mean(x), np.mean(y)
     dist_sig = np.sqrt((x - cx)**2 + (y - cy)**2)
@@ -108,7 +177,7 @@ def extract_entropy_and_moments(base):
     f['high_freq_fft_energy'] = np.sum(freq_data[half_n-15:half_n]**2) # Microscopic surface noise
     f['low_order_fourier_magnitude'] = freq_data[2] + freq_data[3] # Magnitude of 2nd and 3rd harmonics
     
-    # 6. Contour Autocorrelation Decay
+    # 7. Contour Autocorrelation Decay
     # Measures how fast the vase "forgets" its current curvature
     k_centred = k - np.mean(k)
     autocorr = np.correlate(k_centred, k_centred, mode='full')
@@ -118,7 +187,7 @@ def extract_entropy_and_moments(base):
     decay_idx = np.where(autocorr < 0.5)[0]
     f['contour_autocorrelation_decay'] = decay_idx[0] if len(decay_idx) > 0 else len(k)
     
-    # 7. Contour Tortuosity
+    # 8. Contour Tortuosity
     euclidean_dist = np.sqrt((x[-1] - x[0])**2 + (y[-1] - y[0])**2)
     f['contour_tortuosity'] = (p / euclidean_dist) - 1 if euclidean_dist > 0 else 0
 

@@ -1,7 +1,20 @@
 '''
 Python file for computing Derivative Alignment relational features.
-This module executes strict kinematic comparisons between the vase and the target S-curve, 
-bypassing raw spatial coordinates to evaluate the pure structural flow (slopes, angles, and bending).
+This module executes strict kinematic comparisons between the vase and the target S-curve,
+bypassing raw spatial coordinates to evaluate the pure structural flow (slopes, angles, and bending). This includes:
+- Turning Angle Distance
+    - Turning Angle Distance is calculated by integrating the absolute circular difference in tangent angles
+      between the vase and S-curve along the Y-axis using the trapezoidal rule. It evaluates pure trajectory
+      deviation independent of spatial location, penalising mismatched directional flow at each height.
+- Derivative Dtw Distance
+    - Derivative Dtw Distance applies Dynamic Time Warping to the first derivatives (slopes) of both profiles,
+      allowing elastic alignment along the height axis. It prevents false matches between structurally
+      different regions such as flat walls and curved bellies by comparing rate-of-change rather than position.
+- Max Curvature Cross Correlation
+    - Max Curvature Cross Correlation slides the standardised curvature sequence of the vase across the
+      standardised curvature of the S-curve and records the peak of the resulting cross-correlation signal,
+      normalised by the signal length. It identifies the best possible bend-matching alignment between the
+      two profiles, revealing whether the vase reproduces the S-curve's bending pattern in the right order.
 '''
 
 import numpy as np

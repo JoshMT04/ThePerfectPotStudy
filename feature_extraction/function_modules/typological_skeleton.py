@@ -1,7 +1,40 @@
 '''
 Python file for computing Category 7 (Typological / Skeleton).
-This module isolates anatomical landmarks (Foot, Belly, Neck, Lip) to measure 
-the physical transition states and topological skeleton of the digital clay.
+This module isolates anatomical landmarks (Foot, Belly, Neck, Lip) to measure
+the physical transition states and topological skeleton of the digital clay. This includes:
+- Shoulder Prominence
+    - Shoulder Prominence is the maximum value of dx/dy (horizontal rate of change per unit of vertical
+      movement) found in the top 30% of the vase by height. It quantifies the aggressiveness of the
+      shoulder transition, with higher values indicating a more dramatically flaring upper profile.
+- Foot Definition
+    - Foot Definition is the maximum absolute curvature found in the bottom 5% of the vase by height.
+      It measures how sharply the base transitions to the floor, with higher values indicating a more
+      crisply defined foot ring.
+- Neck Elongation
+    - Neck Elongation is the vertical span of the zone where the profile width stays within 5% of the
+      minimum neck width, constrained to the region above the belly. It measures how long the narrowing
+      constriction persists before flaring out again toward the lip.
+- Belly To Neck Distance
+    - Belly to Neck Distance is the absolute vertical distance between the Y-coordinate of the maximum
+      width point (belly) and the Y-coordinate of the minimum width point in the top half (neck). It
+      measures the physical height of the shoulder transition zone.
+- Medial Axis Length
+    - Medial Axis Length is the total vertical height of the vase profile (y_max minus y_min). For a
+      symmetric 1D right-hand profile, the topological core spine coincides with the Y-axis, so this
+      equals the full medial axis length of the shape.
+- Lip Flare Angle
+    - Lip Flare Angle is the absolute angular difference (in degrees) between the tangent direction at
+      the neck and the tangent direction at the absolute top point (lip). It quantifies how dramatically
+      the rim opens or closes relative to the constriction below it.
+- Osculating Transition Radius
+    - Osculating Transition Radius is 1 divided by the maximum absolute curvature in the transition zone
+      between the belly and neck indices, capped at 1000 for near-flat walls. It measures the tightest
+      local radius of curvature in the shoulder region, with small values indicating a sharp, angular
+      belly-to-neck transition.
+- Inflection Point Density
+    - Inflection Point Density is the number of curvature sign changes divided by the total vertical
+      height. It measures how frequently the curve switches bending direction per unit of height,
+      normalising the topological complexity by the vase's physical scale.
 '''
 
 import numpy as np

@@ -142,6 +142,14 @@ def extract_proportions_and_mass(base):
     dx_shoulder = x_max - x_neck
     f['shoulder_slope_angle'] = np.arctan(dx_shoulder / dy_shoulder) * (180 / np.pi) if dy_shoulder != 0 else 90
     
+    f['mean_absolute_curvature'] = np.mean(np.abs(k))
+    
+    f['median_absolute_curvature'] = np.median(np.abs(k))
+    
+    f['curvature_range'] = np.max(k) - np.min(k)
+    
+    f['mode_absolute_curvature'] = np.bincount(np.round(np.abs(k)*100).astype(int)).argmax() / 100
+    
     # Perimeter Convexity 
     # The perimeter convexity is 'how much shorter is a tight string around the shape than the actual perimeter?'
     try:

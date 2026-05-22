@@ -1,7 +1,36 @@
 '''
 Python file for computing Spatial Y-Binning relational features.
-This module executes Piecewise Aggregate Approximation (PAA) by slicing the Y-axis 
-into strict vertical floors to isolate localised topological errors and structural flow.
+This module executes Piecewise Aggregate Approximation (PAA) by slicing the Y-axis
+into strict vertical floors to isolate localised topological errors and structural flow. This includes:
+- Binned Mae Upper Quartile
+    - Binned Mae Upper Quartile is the mean absolute horizontal error computed over only the top 25% of the
+      vase by height. It isolates the accuracy of the lip and upper shoulder region independently from the
+      rest of the profile.
+- Binned Mae Lower Quartile
+    - Binned Mae Lower Quartile is the mean absolute horizontal error computed over only the bottom 25% of
+      the vase by height. It isolates the accuracy of the base and lower body region independently from the
+      rest of the profile.
+- Y Bin N Paa Mean Width (y_bin_N_paa_mean_width)
+    - For each of the N vertical floors, PAA Mean Width is the average X-coordinate of all profile points
+      inside that height band. It provides a piecewise summary of the vase's width at each vertical level.
+- Y Bin N Paa Mae (y_bin_N_paa_mae)
+    - For each vertical floor, PAA Mae is the mean absolute horizontal deviation from the S-curve within
+      that height band. It pinpoints which specific vertical zone contributes most to the total drawing error.
+- Y Bin N Paa Signed Error (y_bin_N_paa_signed_error)
+    - For each vertical floor, PAA Signed Error is the mean signed horizontal difference from the S-curve.
+      Positive values indicate the vase bulges wider than the target in that zone; negative values indicate
+      it pinches narrower.
+- Y Bin N Mean Curvature (y_bin_N_mean_curvature)
+    - For each vertical floor, Mean Curvature is the average signed curvature of all profile points in that
+      height band. It maps how the bending intensity and direction vary across the vase from base to lip.
+- Y Bin N Turning Angle Error (y_bin_N_turning_angle_error)
+    - For each vertical floor, Turning Angle Error is the mean circular angular difference between the vase
+      and S-curve tangent directions within that height band. It measures directional flow mismatch localised
+      to each vertical zone.
+- Point Of Max Divergence Bin Id
+    - Point of Max Divergence Bin ID records the integer index (1 to N) of the vertical floor where the
+      single largest absolute error occurs. It identifies which specific height zone suffered the most
+      catastrophic geometric collapse.
 '''
 
 import numpy as np

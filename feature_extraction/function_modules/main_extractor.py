@@ -417,48 +417,51 @@ def _extract_features_from_dataframe(
             unit='batch',
         )
 
-    for start_idx in batch_starts:
-        batch_groups = pending_groups[start_idx:start_idx + batch_size]
-        results = Parallel(n_jobs=n_jobs, verbose=10)(
-            delayed(process_single_vase)(group, targets_dict, passthrough_cols) for group in batch_groups
-        )
-
-        valid_results = [r for r in results if r is not None]
-        if not valid_results:
-            continue
-
-        if source_csv is not None:
-            for row in valid_results:
-                row['source_csv'] = source_csv
-
-        for row in valid_results:
-            key = _build_vase_key(source_csv, row['user_id'], row['generation'], row['vase'])
-            already_processed_keys.add(key)
-
-        collected_rows.extend(valid_results)
-        buffered_rows.extend(valid_results)
-
-        now = time.time()
-        if checkpoint_output_path and (now - last_checkpoint_time >= checkpoint_interval_seconds):
-            checkpoint_df = pd.DataFrame(buffered_rows)
-            _append_checkpoint(checkpoint_df, checkpoint_output_path)
-            print(
-                f"   Checkpoint saved: {len(checkpoint_df)} rows appended to "
-                f"{checkpoint_output_path}."
+    # Use Parallel as a context manager so the worker pool is created once and
+    # reused across all batches — avoids spawning/killing workers every 50 vases.
+    with Parallel(n_jobs=n_jobs, verbose=0) as parallel:
+        for start_idx in batch_starts:
+            batch_groups = pending_groups[start_idx:start_idx + batch_size]
+            results = parallel(
+                delayed(process_single_vase)(group, targets_dict, passthrough_cols) for group in batch_groups
             )
-            if process_log_path:
-                _append_process_log(
-                    log_csv_path=process_log_path,
-                    event_type='checkpoint',
-                    details={
-                        'source_csv': source_csv,
-                        'rows_written': int(len(checkpoint_df)),
-                        'rows_collected_total': int(len(collected_rows)),
-                        'pending_groups_total': int(len(pending_groups)),
-                    },
+
+            valid_results = [r for r in results if r is not None]
+            if not valid_results:
+                continue
+
+            if source_csv is not None:
+                for row in valid_results:
+                    row['source_csv'] = source_csv
+
+            for row in valid_results:
+                key = _build_vase_key(source_csv, row['user_id'], row['generation'], row['vase'])
+                already_processed_keys.add(key)
+
+            collected_rows.extend(valid_results)
+            buffered_rows.extend(valid_results)
+
+            now = time.time()
+            if checkpoint_output_path and (now - last_checkpoint_time >= checkpoint_interval_seconds):
+                checkpoint_df = pd.DataFrame(buffered_rows)
+                _append_checkpoint(checkpoint_df, checkpoint_output_path)
+                print(
+                    f"   Checkpoint saved: {len(checkpoint_df)} rows appended to "
+                    f"{checkpoint_output_path}."
                 )
-            buffered_rows = []
-            last_checkpoint_time = now
+                if process_log_path:
+                    _append_process_log(
+                        log_csv_path=process_log_path,
+                        event_type='checkpoint',
+                        details={
+                            'source_csv': source_csv,
+                            'rows_written': int(len(checkpoint_df)),
+                            'rows_collected_total': int(len(collected_rows)),
+                            'pending_groups_total': int(len(pending_groups)),
+                        },
+                    )
+                buffered_rows = []
+                last_checkpoint_time = now
 
     print("5. Purging corrupted arrays and compiling master matrix...")
     if checkpoint_output_path and buffered_rows:

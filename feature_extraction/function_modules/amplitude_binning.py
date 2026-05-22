@@ -1,7 +1,30 @@
 '''
 Python file for computing the Amplitude (Horizontal) Binning relational features.
-This module mathematically slices the 1D profile into strict radial zones (amplitudes) 
-to map where the spatial error and kinematic bending occur relative to the centreline.
+This module mathematically slices the 1D profile into strict radial zones (amplitudes)
+to map where the spatial error and kinematic bending occur relative to the centreline. This includes:
+- Amplitude Bin N Peak/Valley Residence (amp_bin_N_peak_valley_residence)
+    - For each of the N radial zones, Peak/Valley Residence is calculated as the proportion of profile
+      points that fall within that horizontal distance band. It indicates how much of the drawn line
+      spends time at a given amplitude, revealing whether the vase hugs the centreline or swings wide.
+- Amplitude Bin N Vertical Span (amp_bin_N_vertical_span)
+    - For each radial zone, Vertical Span is the difference between the maximum and minimum Y-coordinates
+      of all points inside that amplitude band. It measures the height range traversed while the vase wall
+      stays within a specific horizontal distance from the centreline.
+- Amplitude Bin N Iso Crossing Count (amp_bin_N_iso_crossing_count)
+    - For each radial zone, Iso Crossing Count counts the number of times the profile crosses the lower
+      boundary of that amplitude band by detecting sign changes in the shifted X-coordinate array.
+      It quantifies how many times the curve oscillates in and out of that horizontal zone.
+- Amplitude Bin N Mean Curvature (amp_bin_N_mean_curvature)
+    - For each radial zone, Mean Curvature is the average signed curvature of all profile points inside
+      that amplitude band. It reveals how sharply the vase bends whilst occupying a specific horizontal range.
+- Amplitude Bin N Mae (amp_bin_N_mae)
+    - For each radial zone, Mae is the mean absolute deviation of all points inside that amplitude band
+      from the target S-curve. It localises the drawing error to specific horizontal distances, isolating
+      whether mistakes happen near the centreline or at the widest extents.
+- Amplitude Discontinuity
+    - Amplitude Discontinuity counts the total number of radial zones that contain zero profile points.
+      It detects topological gaps where the vase wall completely skips a horizontal distance range,
+      indicating an unusual or abrupt profile shape.
 '''
 
 import numpy as np

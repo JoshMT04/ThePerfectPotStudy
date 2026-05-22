@@ -1,7 +1,67 @@
 '''
 Python file for computing Category 4 (Vertical Asymmetry) and Category 8 (Distributional Binning).
-This module slices the digital clay into strict vertical floors to measure the volumetric 
-imbalance across the Y-axis and evaluates the statistical distribution of the widths.
+This module slices the digital clay into strict vertical floors to measure the volumetric
+imbalance across the Y-axis and evaluates the statistical distribution of the widths. This includes:
+- Vertical Area Asymmetry
+    - Vertical Area Asymmetry is the absolute difference between the 2D area of the top half and the 2D
+      area of the bottom half of the vase, split at the vertical midpoint. It measures the volumetric
+      imbalance between the upper and lower portions of the shape.
+- Midpoint Y Deviation
+    - Midpoint Y Deviation is the difference between the Y-weighted centroid of the profile (computed via
+      trapezoidal integration) and the geometric midpoint of the Y-axis span. Positive values indicate
+      the visual mass centre sits above the midpoint; negative values indicate it sits below.
+- Vertical Bending Ratio
+    - Vertical Bending Ratio divides the sum of squared curvature in the top half by the sum of squared
+      curvature in the bottom half. It measures whether the vase expends more bending energy in the upper
+      shoulder and lip region or in the lower belly and base region.
+- Vertical Hausdorff Distance
+    - Vertical Hausdorff Distance is the Hausdorff distance between the top half coordinates and the
+      bottom half coordinates after folding the bottom half upward over the midpoint axis. It measures the
+      geometric dissimilarity between the shape's upper and lower halves when superimposed.
+- Vertical Contour Length Ratio
+    - Vertical Contour Length Ratio divides the arc length of the top half of the profile by the arc
+      length of the bottom half. It quantifies whether the upper portion of the vase has a longer,
+      more complex path than the lower portion.
+- Width Interquartile Range
+    - Width Interquartile Range is the difference between the 75th and 25th percentiles of the X-coordinate
+      (width) array across the full profile. It measures the spread of widths in the central portion of the
+      distribution, robust to extreme base or lip values.
+- Radial Dist Interquartile Range
+    - Radial Distribution Interquartile Range applies the same 75th-minus-25th-percentile calculation to
+      the X-coordinates of the core profile region (excluding the bottom 5% and top 5% by height). It
+      focuses the width spread measurement on the main body, discarding the foot and lip extremes.
+- Extreme Convexity Proportion
+    - Extreme Convexity Proportion is the fraction of curvature values exceeding the 90th percentile. It
+      measures how much of the profile is occupied by the sharpest outward-bending regions.
+- Extreme Concavity Proportion
+    - Extreme Concavity Proportion is the fraction of curvature values below the 10th percentile. It
+      measures how much of the profile is occupied by the sharpest inward-bowing regions.
+- Flatness Proportion
+    - Flatness Proportion is the fraction of curvature values with absolute magnitude below 0.001. It
+      measures how much of the vase profile is essentially straight, with negligible bending in either
+      direction.
+- Bottom Third Area Mass
+    - Bottom Third Area Mass is the 2D area of the lowest third of the vase by height divided by the
+      total 2D area. It measures what proportion of the vase's overall shape mass is concentrated in the
+      base third.
+- Mid Third Area Mass
+    - Mid Third Area Mass is the 2D area of the middle third of the vase by height divided by the total
+      2D area. It measures what proportion of the vase's overall shape mass is concentrated in the belly
+      region.
+- Top Third Area Mass
+    - Top Third Area Mass is the 2D area of the top third of the vase by height divided by the total 2D
+      area. It measures what proportion of the vase's overall shape mass is concentrated in the shoulder
+      and lip region.
+- Upper Half Average Width
+    - Upper Half Average Width is the mean X-coordinate (radius) of all profile points in the top half of
+      the vase. It provides a single summary of the typical width above the vertical midpoint.
+- Lower Half Average Width
+    - Lower Half Average Width is the mean X-coordinate (radius) of all profile points in the bottom half
+      of the vase. It provides a single summary of the typical width below the vertical midpoint.
+- Y Axis Width Variance
+    - Y Axis Width Variance is the variance of the X-coordinate (width) array across the full profile.
+      It measures the overall spread of widths from base to lip, with higher values indicating a more
+      dramatically varying silhouette.
 '''
 
 import numpy as np

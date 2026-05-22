@@ -1,7 +1,82 @@
 '''
 Python file for computing Strict Spatial Error and Topological Flexibility features.
 This module calculates the exact physical deviation between the digital clay and the target S-curve,
-measuring absolute Euclidean distances, spatial bounding errors, and elastic path warping.
+measuring absolute Euclidean distances, spatial bounding errors, and elastic path warping. This includes:
+- Rmse
+    - RMSE (Root Mean Square Error) is the square root of the mean squared horizontal difference between
+      the vase profile and the S-curve at every shared Y-coordinate. It is the standard penalty for spatial
+      deviation, weighting large errors more heavily than small ones.
+- Mae
+    - Mae (Mean Absolute Error) is the average of the absolute horizontal differences between the vase and
+      the S-curve. It measures the typical physical gap in a way that is robust against a single sharp outlier.
+- Chebyshev Max Error
+    - Chebyshev Max Error is the maximum absolute horizontal difference across all shared Y-coordinates.
+      It isolates the single most extreme physical deviation, identifying the worst-case spatial collapse.
+- Open Procrustes Distance
+    - Open Procrustes Distance is the sum of squared differences after independently centring both the vase
+      and S-curve by subtracting their respective means. It measures the residual shape mismatch after the
+      optimal translational alignment has been applied.
+- Area Between Curves
+    - Area Between Curves is the trapezoidal integral of the absolute horizontal error over the full Y-axis
+      span. It quantifies the true 2D physical gap existing between the two overlaid profiles.
+- Curve Length Ratio
+    - Curve Length Ratio divides the arc length of the vase profile by the arc length of the S-curve.
+      It measures how much extra meandering path was required to draw the vase compared to the ideal shape.
+- Intersection Count
+    - Intersection Count is the number of sign changes in the signed error array. It counts how many times
+      the vase profile physically crosses the S-curve, weaving back and forth across the target.
+- Hausdorff Distance
+    - Hausdorff Distance is the maximum of the two directed Hausdorff distances between the vase and S-curve
+      coordinate arrays. It finds the point on one curve that is most isolated from the other, representing
+      the worst-case nearest-neighbour gap.
+- Spatial Dtw Distance
+    - Spatial DTW Distance applies Dynamic Time Warping to the 2D spatial coordinate arrays of the vase and
+      S-curve, allowing elastic alignment along the height axis. It measures curve similarity while tolerating
+      vertical phase shifts such as a belly positioned slightly higher or lower than ideal.
+- Modified Hausdorff Distance
+    - Modified Hausdorff Distance averages the minimum nearest-neighbour distances in both directions between
+      the two coordinate arrays, rather than taking the maximum. It provides a smoother global measure of
+      shape dissimilarity that is less sensitive to isolated outlier points.
+- Longest Common Subsequence Ratio
+    - Longest Common Subsequence Ratio computes the length of the longest common subsequence of coordinate
+      pairs within a 5%-of-target-width spatial tolerance, divided by the longer curve's length. It measures
+      what fraction of the vase profile stays continuously close to the S-curve.
+- Elastic Shape Distance Srvf
+    - Elastic Shape Distance SRVF is the trapezoidal integral of the squared difference between the Square
+      Root Velocity Functions of the two profiles. It measures the pure bending and stretching energy needed
+      to deform the vase into the S-curve, invariant to differences in drawing speed.
+- Earth Movers Distance
+    - Earth Mover's Distance (Wasserstein-1) is the minimum cost to transform the empirical X-coordinate
+      distribution of the vase into the X-coordinate distribution of the S-curve. It measures the physical
+      effort required to redistribute the vase's horizontal mass to match the target.
+- Qq Deviation
+    - QQ Deviation is the sum of squared differences between the sorted X-coordinates of the vase and the
+      sorted X-coordinates of the S-curve. It strips away Y-axis position entirely to compare the ranked
+      width severity between the two profiles.
+- Jensen Shannon Divergence
+    - Jensen-Shannon Divergence is the squared JS metric computed on the 50-bin curvature histograms of the
+      vase and S-curve. It measures how fundamentally different the probability distributions of bending are
+      between the two profiles.
+- Area Error Ratio
+    - Area Error Ratio divides the Area Between Curves by the total physical area under the S-curve. It
+      normalises the absolute gap by the target's own size, making the error comparable across vases of
+      different scales.
+- Signed Area Bias
+    - Signed Area Bias is the trapezoidal integral of the signed horizontal error over the full Y-axis span.
+      Positive values indicate the vase is globally fatter than the ideal; negative values indicate it is
+      thinner overall.
+- Max Curvature Spatial Deviation
+    - Max Curvature Spatial Deviation is the Euclidean distance between the point of maximum absolute
+      curvature on the vase and the point of maximum absolute curvature on the S-curve. It measures how
+      far apart the sharpest bends of the two profiles are in physical space.
+- Contour Phase Angle
+    - Contour Phase Angle is the absolute angular difference (in degrees) between the centroid vectors of
+      the vase and S-curve measured from the base origin. It quantifies the directional shift of the overall
+      mass centre between the drawn shape and the ideal target.
+- Frechet Distance
+    - Fréchet Distance is the discrete dog-walking metric computed via dynamic programming on the full 2D
+      coordinate arrays. It enforces sequential topological order and finds the minimum continuous leash
+      length, measuring the tightest possible simultaneous traversal of both curves.
 '''
 
 import numpy as np

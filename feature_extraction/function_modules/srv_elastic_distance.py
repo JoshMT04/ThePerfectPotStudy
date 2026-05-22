@@ -1,8 +1,14 @@
 '''
-Python file for computing true Elastic Shape Analysis using the 
-Square Root Velocity (SRV) framework.
-Calculates the pure bending and stretching energy required to deform 
-the vase profile into the target S-Curve, invariant to phase shifts.
+Python file for computing true Elastic Shape Analysis using the
+Square Root Velocity (SRV) framework via the fdasrsf library.
+Calculates the pure bending and stretching energy required to deform
+the vase profile into the target S-Curve, invariant to phase shifts. This includes:
+- Srv Elastic Shape Distance
+    - SRV Elastic Shape Distance is calculated by converting both the vase and S-curve into 2D Square Root
+      Velocity (SRV) q-functions and computing the elastic distance between them using the fdasrsf
+      elastic_distance_curve function. It dynamically re-parametrises the S-curve to achieve the best
+      possible geometric alignment before measuring the residual L2 norm, providing a distance that is
+      invariant to differences in drawing speed or vertical phase shifts.
 '''
 
 import numpy as np
