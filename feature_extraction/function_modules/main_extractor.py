@@ -150,12 +150,10 @@ def _normalise_xy_schema(df_raw, metadata_df=None):
     '''
     Normalises legacy and new XY schemas into the canonical columns expected by feature extraction.
     '''
-    df = df_raw.copy()
-
     rename_map = {}
-    generation_col = _choose_first_existing_column(df, ['generation', 'generation_key', 'gen'])
-    user_col = _choose_first_existing_column(df, ['user_id', 'participant_id', 'session_id'])
-    selected_col = _choose_first_existing_column(df, ['gen_selected_vase', 'is_selected_vase'])
+    generation_col = _choose_first_existing_column(df_raw, ['generation', 'generation_key', 'gen'])
+    user_col = _choose_first_existing_column(df_raw, ['user_id', 'participant_id', 'session_id'])
+    selected_col = _choose_first_existing_column(df_raw, ['gen_selected_vase', 'is_selected_vase'])
 
     if generation_col and generation_col != 'generation':
         rename_map[generation_col] = 'generation'
@@ -164,8 +162,9 @@ def _normalise_xy_schema(df_raw, metadata_df=None):
     if selected_col and selected_col != 'gen_selected_vase':
         rename_map[selected_col] = 'gen_selected_vase'
 
-    if rename_map:
-        df = df.rename(columns=rename_map)
+    # rename() returns a new DataFrame that shares the underlying column arrays
+    # (no deep copy of data) — avoids duplicating a potentially multi-GB dataset.
+    df = df_raw.rename(columns=rename_map) if rename_map else df_raw
 
     # Merge participant metadata when available.
     if metadata_df is not None and not metadata_df.empty:
@@ -199,72 +198,64 @@ def _normalise_xy_schema(df_raw, metadata_df=None):
 # -----------------------------------------
 # ATOMIC EXECUTION UNIT
 # -----------------------------------------
-def process_single_vase(vase_group, targets_dict, passthrough_cols=None):
+def process_single_vase(vase_record, targets_dict, passthrough_cols=None):
     '''
     Processes exactly one 250-point half-profile.
+    Accepts a lightweight dict with pre-sorted numpy arrays (x, y already abs-sorted).
     '''
-    # 1. Administrative Identifiers
-    user_id = vase_group['user_id'].iloc[0]
-    generation = vase_group['generation'].iloc[0]
-    vase_id = vase_group['vase'].iloc[0]
-    
-    selected_vase = vase_group['gen_selected_vase'].iloc[0]
+    user_id   = vase_record['user_id']
+    generation = vase_record['generation']
+    vase_id   = vase_record['vase']
+    x_coords  = vase_record['x']   # already abs-valued and y-sorted
+    y_coords  = vase_record['y']
+
+    selected_vase = vase_record.get('gen_selected_vase')
     if isinstance(selected_vase, (bool, np.bool_)):
         is_selected = int(selected_vase)
     elif isinstance(selected_vase, str) and selected_vase.strip().lower() in {'true', 'false'}:
         is_selected = int(selected_vase.strip().lower() == 'true')
-    elif pd.isna(selected_vase):
+    elif selected_vase is None or (isinstance(selected_vase, float) and np.isnan(selected_vase)):
         is_selected = 0
     else:
         is_selected = 1 if vase_id == selected_vase else 0
-    
-    # 2. Geometric Purification
-    # Sort strictly by the Y-axis from bottom (base) to top (lip)
-    vase_group = vase_group.sort_values(by='y', ascending=True)
-    y_coords = vase_group['y'].values
-    # Enforce Absolute Right-Hand Domain
-    x_coords = np.abs(vase_group['x'].values) 
-    
+
     # Validation constraint: ensure strict dimensional integrity
     if len(x_coords) != 250:
         return None
-        
-    # 3. Base Intrinsic Mathematics
+
+    # Base Intrinsic Mathematics
     xy_array = np.column_stack((x_coords, y_coords))
     base_state = compute_base_kinematics(xy_array)
-    
-    # 4. Execute the 84-Dimensional Intrinsic Extraction
+
     features = {
         'user_id': user_id,
         'generation': generation,
         'vase': vase_id,
-        'is_selected': is_selected
+        'is_selected': is_selected,
     }
 
-    # Preserve metadata/context fields for each vase using the first row in the group.
     passthrough_cols = passthrough_cols or []
     for col in passthrough_cols:
         if col in features:
             continue
-        if col in vase_group.columns:
-            features[col] = vase_group[col].iloc[0]
-    
+        if col in vase_record:
+            features[col] = vase_record[col]
+
     features.update(extract_proportions_and_mass(base_state))
     features.update(extract_kinematics(base_state))
     features.update(extract_entropy_and_moments(base_state))
     features.update(extract_vertical_asymmetry_and_binning(base_state))
     features.update(extract_typological_skeleton(base_state))
-    
-    # 5. Execute the Relational S-Curve Matching Matrix
+
     for target_name, target_x in targets_dict.items():
         relational_features = compare_vase_to_target(
-            y_coords=y_coords, 
-            vase_x=x_coords, 
-            target_x=target_x, 
-            target_name=target_name
+            y_coords=y_coords,
+            vase_x=x_coords,
+            target_x=target_x,
+            target_name=target_name,
         )
         features.update(relational_features)
-        
+
     return features
 
 
@@ -376,23 +367,37 @@ def _extract_features_from_dataframe(
         df_raw = extract_stratified_prototype_subset(df_raw, user_fraction=0.05)
 
     print("3. Partitioning dataset into individual vase profiles...")
-    grouped = [group for _, group in df_raw.groupby(['user_id', 'generation', 'vase'])]
-    total_vases = len(grouped)
+    grouped_iter = df_raw.groupby(['user_id', 'generation', 'vase'])
+    total_vases = grouped_iter.ngroups
     print(f"   Successfully isolated {total_vases} unique mathematical arrays.")
 
+    # Convert each group to a lightweight dict of numpy arrays immediately.
+    # This avoids holding ~80k pandas DataFrame objects in memory simultaneously
+    # and drastically reduces the pickle payload sent to each worker.
+    extra_cols = [c for c in (passthrough_cols or []) if c in df_raw.columns]
     pending_groups = []
     skipped_count = 0
-    for group in grouped:
-        key = _build_vase_key(
-            source_csv,
-            group['user_id'].iloc[0],
-            group['generation'].iloc[0],
-            group['vase'].iloc[0],
-        )
+    for (uid, gen, vid), group in grouped_iter:
+        key = _build_vase_key(source_csv, uid, gen, vid)
         if key in already_processed_keys:
             skipped_count += 1
             continue
-        pending_groups.append(group)
+        grp_sorted = group.sort_values('y', ascending=True)
+        record = {
+            'user_id':          uid,
+            'generation':       gen,
+            'vase':             vid,
+            'gen_selected_vase': group['gen_selected_vase'].iloc[0],
+            'x': np.abs(grp_sorted['x'].values),
+            'y': grp_sorted['y'].values,
+        }
+        for col in extra_cols:
+            record[col] = group[col].iloc[0]
+        pending_groups.append(record)
+
+    # Free the full raw DataFrame before the parallel loop so worker processes
+    # do not inherit or compete for its memory.
+    del df_raw, grouped_iter
 
     if skipped_count > 0:
         print(f"   Resume mode: skipping {skipped_count} already processed vases.")
