@@ -1,9 +1,12 @@
 .DS_store
 .venv
+.venv-ddm
+.venv-nn
 __pycache__
 *.pyc
 *.pyo
 *.pyd
+*.nc
 *.db
 *.sqlite3
 *.log
