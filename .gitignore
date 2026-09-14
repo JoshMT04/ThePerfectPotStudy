@@ -10,3 +10,4 @@ jnd_test/
 .env
 .env.*
 .DS_Store
+.tmp.driveupload
