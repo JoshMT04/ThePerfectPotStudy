@@ -19,3 +19,4 @@ feature_extraction/outdir/pairwise_xgb_within_round_vase_delta_matrix.csv
 feature_extraction/outdir/xgb_rank_items_within_round.csv
 feature_extraction/outdir/master_feature_matrix_compiled.parquet
 .tmp.driveupload
+random_figs/

@@ -45,6 +45,20 @@ def load_umap_data(path: str, source: str = "game") -> pd.DataFrame:
              'ai'   — extracts from 'generation_key', keeps only phase == 'main'
     """
     df = pd.read_parquet(path)
+
+    # PC-based projection files carry coordinates as umap_x_pc/umap_y_pc rather than
+    # umap_x/umap_y; normalise so the rest of the pipeline doesn't need to know which
+    # projection it's working with.
+    if "umap_x" not in df.columns and "umap_x_pc" in df.columns:
+        df = df.rename(columns={"umap_x_pc": "umap_x", "umap_y_pc": "umap_y"})
+
+    # Combined/full files hold all sources (real, game, ai_game) in one table; filter
+    # down to the requested source before extracting generation, otherwise rows from
+    # other sources produce NaN and break the int cast downstream.
+    source_col_value = {"game": "game", "ai": "ai_game"}.get(source)
+    if source_col_value is not None and "source" in df.columns:
+        df = df[df["source"] == source_col_value].copy()
+
     if source == "game":
         df["generation"] = df["vase_id"].str.extract(r"(gen_\d+)").iloc[:, 0]
     elif source == "ai":
