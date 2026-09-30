@@ -1,0 +1,311 @@
+---
+title: "Figure: the neutral benchmark (human vs random-choice games)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+params:
+  data_dir: "/Users/armandleroi/Documents/Perfect_Pot_Project/Perfect_Pot_Game_data_280926"
+  null_file: "null_run_pc_matched.parquet"
+  fit_dir: "/Users/armandleroi/Documents/Perfect_Pot_Project/beauty_landscape/output"
+  fit_main: "fit6d_k500_m2_s2.5_noparent.rds"   # the landscape model of the main text
+  out_dir: "."
+  grid_n: 60          # grid per plane for the averaged landscape and the A-vs-B statistics (slow: cached)
+  dens_grid_n: 150    # finer grid per plane for drawing the density maps (fast)
+  dens_bw_mult: 1.5   # density bandwidth = this x the normal-reference bandwidth (bandwidth.nrd), same for human and random
+  pd_ref_n: 1000      # vases averaged over for the averaged landscape
+  arrow_per_axis: 28  # arrow-field grid: spacing = plotted axis range / this, so glyph density is the same in every plane
+  arrow_bw: 1.5       # Gaussian kernel bandwidth, in units of the grid spacing
+  arrow_min_eff_n: 30 # minimum effective number of rounds behind an arrow
+  arrow_len: 0.7      # glyph length as a fraction of the grid spacing (direction only)
+  lr_cap: 1           # log-ratio colour scale capped at +/- this (shared by the planes); beyond it, full colour
+  z_crit: 3           # outline cells where |log ratio| > z_crit x its SD between random repeats
+  seed: 1
+---
+
+Compares where human choices took the vases with where random choices, made in the same games, took them. The computer played the game exactly as offered to humans (same generator, including its mutation schedule and its rejection of self-intersecting vases), from the same first-generation pairs, choosing at random, 10 times over (`null_repeat` 1-10). Everything is drawn on the same three PC planes and axes as the landscape figure (`figure_landscape/`).
+
+Two rows:
+
+* **A. The landscape, averaged.** Density maps are projections: they integrate over the four PCs not shown. The comparable landscape is therefore the landscape *averaged* over those four PCs (averaged over the distinct vases shown), not the slice through zero of `figure_landscape`.
+* **B. Where selection concentrated vases.** log(human density / random density) for the vases chosen in generation 5. Under selection, the density of survivors is the neutral density multiplied by their relative success, so this log-ratio is on a log-odds-like scale, comparable in sign and shape to the landscape. Outlined: where |log ratio| exceeds `z_crit` times its SD between random repeats (each repeat against the other nine).
+* **Arrows on B: which way selection pushed.** For each human round, the displacement human endpoint − mean of its 10 random twins' endpoints, attached to the round's starting point (midpoint of the generation-1 pair). On a grid over the region where rounds started (spacing = plotted axis range / `arrow_per_axis`, so the same glyph density in every plane), the displacements are kernel-smoothed (Gaussian, bandwidth `arrow_bw` grid spacings). Each glyph shows direction only, at constant length; its shade gives the strength, standardised as displacement in SDs of each PC among the random games' generation-5 choices (the mutation step, and so how far any lineage can move, scales with each PC's spread); faded glyphs are not distinguishable from zero (strength < 2 SE). The glyphs do not join actual endpoints. Row B uses no model; row A is masked to its region.
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, dpi = 150)
+suppressPackageStartupMessages({
+  library(mgcv); library(data.table); library(arrow); library(MASS)
+  library(ggplot2); library(patchwork)
+})
+set.seed(params$seed)
+P <- paste0("PC", 1:6)
+planes <- list(c(1, 2), c(3, 4), c(5, 6))
+```
+
+## Data
+
+```{r data}
+k <- c("participant_id", "play_counter", "generation_key", "vase")
+wide <- function(dt, extra = NULL) {
+  dt <- unique(as.data.table(dt), by = c(extra, k, "pc_name"))
+  w <- dcast(dt, as.formula(paste(paste(c(extra, k, "is_selected_vase", "is_parent_vase"), collapse = " + "), "~ pc_name")),
+             value.var = "pc_value")
+  w[, gen := as.integer(sub(".*gen_", "", generation_key))]
+  w[, rnd := sub("_gen.*", "", generation_key)]
+  w
+}
+h <- wide(read_parquet(file.path(params$data_dir, "pc_data.parquet")))
+n <- wide(read_parquet(file.path(params$data_dir, params$null_file)), extra = "null_repeat")
+round_key <- c("participant_id", "play_counter", "rnd")
+
+h5 <- h[gen == 5 & is_selected_vase == TRUE]
+n5 <- n[gen == 5 & is_selected_vase == TRUE]
+start <- h[gen == 1, lapply(.SD, mean), by = round_key, .SDcols = P]     # midpoint of the gen-1 pair
+
+g1_same <- merge(h[gen == 1, c(k, P), with = FALSE], n[gen == 1 & null_repeat == 1, c(k, P), with = FALSE], by = k)
+stopifnot(max(abs(as.matrix(g1_same[, paste0(P, ".x"), with = FALSE]) -
+                  as.matrix(g1_same[, paste0(P, ".y"), with = FALSE]))) == 0)
+cat(sprintf("human rounds: %d; random repeats: %d (%d rounds each); gen-1 pairs identical: yes\n",
+            nrow(h5), uniqueN(n$null_repeat), nrow(n5) / uniqueN(n$null_repeat)))
+cat("first position chosen in random games, by repeat:\n")
+print(round(n[vase == "vase_1", mean(is_selected_vase), by = null_repeat]$V1, 3))
+```
+
+## Mean shift
+
+```{r shift}
+shift <- data.table(PC = P,
+  human_mean = colMeans(h5[, ..P]), random_mean = colMeans(n5[, ..P]),
+  random_repeat_sd = n5[, lapply(.SD, mean), by = null_repeat, .SDcols = P][, sapply(.SD, sd), .SDcols = P],
+  sd_ratio = sapply(P, function(p) sd(h5[[p]]) / sd(n5[[p]])))
+shift[, shift := human_mean - random_mean]
+shift[, shift_in_repeat_sds := shift / random_repeat_sd]
+knitr::kable(shift, digits = 2, caption = "Selected generation-5 vases: human vs random (10 repeats pooled). random_repeat_sd = SD of the repeat means.")
+fwrite(shift, file.path(params$out_dir, "benchmark_mean_shift.csv"))
+```
+
+## The landscape model
+
+```{r model}
+m6 <- readRDS(file.path(params$fit_dir, params$fit_main))
+sm <- m6$smooth[[1]]; idx <- sm$first.para:sm$last.para
+f_at <- function(X, chunk = 50000) {
+  X <- as.data.frame(X); names(X) <- P
+  out <- numeric(nrow(X))
+  for (s in seq(1, nrow(X), by = chunk)) {
+    r <- s:min(nrow(X), s + chunk - 1)
+    out[r] <- PredictMat(sm, cbind(X[r, , drop = FALSE], L = 1)) %*% coef(m6)[idx]
+  }
+  out
+}
+nodes <- h[is_parent_vase == FALSE]
+X_nodes <- as.matrix(nodes[, ..P])
+f_nodes <- f_at(X_nodes)
+f_ref <- sample(f_nodes, 5000)
+p_beat <- function(fx) vapply(fx, function(v) mean(plogis(v - f_ref)), 0)
+```
+
+## Do human endpoints sit higher on the landscape than their random twins?
+
+In six dimensions, with no projection. For each human round, the attractiveness of its generation-5 choice is compared with the mean over its 10 random twins. The landscape was fitted to the same human choices, so this checks the model's consistency with where the choices led, not an independent test.
+
+```{r uphill}
+fh <- h5[, .(participant_id, play_counter, rnd, f_h = f_at(as.matrix(.SD))), .SDcols = P]
+fn <- n5[, .(participant_id, play_counter, rnd, f_n = f_at(as.matrix(.SD))), .SDcols = P][
+  , .(f_n = mean(f_n)), by = round_key]
+up <- merge(fh, fn, by = round_key)
+up_tab <- data.table(
+  statistic = c("rounds", "human endpoint higher than mean of random twins (%)",
+                "mean P(beats random), human endpoints", "mean P(beats random), random endpoints"),
+  value = c(nrow(up), 100 * mean(up$f_h > up$f_n), mean(p_beat(up$f_h)), mean(p_beat(fn$f_n))))
+knitr::kable(up_tab, digits = 3)
+fwrite(up_tab, file.path(params$out_dir, "benchmark_uphill.csv"))
+```
+
+## Selection arrows
+
+δ_i = human endpoint − mean of the random twins' endpoints (6-D). Its agreement with the local uphill direction of the landscape, ∇f at the round's starting point, in 6-D:
+
+```{r arrows6d}
+Xn_mean <- n5[, lapply(.SD, mean), by = round_key, .SDcols = P]
+arr <- merge(merge(h5[, c(round_key, P), with = FALSE], Xn_mean, by = round_key, suffixes = c("_h", "_n")),
+             start, by = round_key)
+D <- as.matrix(arr[, paste0(P, "_h"), with = FALSE]) - as.matrix(arr[, paste0(P, "_n"), with = FALSE])
+S <- as.matrix(arr[, ..P])
+grad_at <- function(X, h = 1e-3) {
+  n <- nrow(X)
+  Xs <- do.call(rbind, lapply(1:6, function(j) { Xp <- X; Xp[, j] <- Xp[, j] + h; Xm <- X; Xm[, j] <- Xm[, j] - h; rbind(Xp, Xm) }))
+  v <- f_at(Xs)
+  sapply(1:6, function(j) { o <- (j - 1) * 2 * n; (v[o + 1:n] - v[o + n + 1:n]) / (2 * h) })
+}
+G <- grad_at(S)
+cosv <- rowSums(D * G) / (sqrt(rowSums(D^2)) * sqrt(rowSums(G^2)))
+ar_tab <- data.table(
+  statistic = c("median arrow length (PC units)", "arrows pointing uphill at the start (%)",
+                "mean cosine(arrow, gradient)", "cosine of the mean arrow with the mean gradient"),
+  value = c(median(sqrt(rowSums(D^2))), 100 * mean(cosv > 0), mean(cosv),
+            sum(colMeans(D) * colMeans(G)) / (sqrt(sum(colMeans(D)^2)) * sqrt(sum(colMeans(G)^2)))))
+knitr::kable(ar_tab, digits = 3)
+fwrite(ar_tab, file.path(params$out_dir, "benchmark_arrows.csv"))
+```
+
+## Maps
+
+```{r maps}
+rng0 <- apply(as.matrix(rbind(h[, ..P], n[null_repeat == 1, ..P])), 2, range)
+grid_of <- function(a, b, n = params$grid_n) list(u = seq(rng0[1, a], rng0[2, a], length.out = n),
+                                                 v = seq(rng0[1, b], rng0[2, b], length.out = n))
+
+# A. landscape averaged over the four PCs not shown (partial dependence), cached
+pd_file <- file.path(params$out_dir, sprintf("pd_cache_%s_g%d_r%d.rds", sub(".rds$", "", params$fit_main), params$grid_n, params$pd_ref_n))
+pd <- if (file.exists(pd_file)) readRDS(pd_file) else {
+  ref <- X_nodes[sample(nrow(X_nodes), params$pd_ref_n), ]
+  r <- lapply(planes, function(ab) {
+    gr <- grid_of(ab[1], ab[2]); g <- CJ(u = gr$u, v = gr$v)
+    fbar <- vapply(seq_len(nrow(g)), function(i) {
+      X <- ref; X[, ab[1]] <- g$u[i]; X[, ab[2]] <- g$v[i]; mean(f_at(X)) }, 0)
+    g[, fbar := fbar]; g })
+  saveRDS(r, pd_file); r }
+
+# B. log density ratio, human vs random, with the range between random repeats
+kde_on <- function(x, y, gr, bw) MASS::kde2d(x, y, h = bw, n = length(gr$u), lims = c(range(gr$u), range(gr$v)))$z
+dens_on <- function(ngrid) lapply(planes, function(ab) {
+  a <- P[ab[1]]; b <- P[ab[2]]; gr <- grid_of(ab[1], ab[2], ngrid)
+  bw <- params$dens_bw_mult * c(MASS::bandwidth.nrd(n5[[a]]), MASS::bandwidth.nrd(n5[[b]]))
+  zh <- kde_on(h5[[a]], h5[[b]], gr, bw)
+  zn <- kde_on(n5[[a]], n5[[b]], gr, bw)
+  # null: each repeat against the other nine, same sample sizes as human vs pooled
+  zr <- lapply(1:10, function(r) {
+    z1 <- kde_on(n5[null_repeat == r][[a]], n5[null_repeat == r][[b]], gr, bw)
+    z9 <- kde_on(n5[null_repeat != r][[a]], n5[null_repeat != r][[b]], gr, bw)
+    list(lr = as.vector(log(z1 / z9)), dd = as.vector(z1 - z9)) })
+  g <- data.table(u = rep(gr$u, times = length(gr$v)), v = rep(gr$v, each = length(gr$u)))   # kde2d z is [u, v]: u runs fastest
+  g[, lr := as.vector(log(zh / zn))]
+  g[, null_sd := apply(sapply(zr, `[[`, "lr"), 1, sd)]
+  g[, z := lr / null_sd]
+  # raw density difference (SI), per unit area in PC units^2, with its own chance range
+  g[, dd := as.vector(zh - zn)]
+  g[, dd_z := dd / apply(sapply(zr, `[[`, "dd"), 1, sd)]
+  # mask where the random games put too few vases: below the density level enclosing 99% of them
+  dn <- as.vector(zn); o <- order(dn, decreasing = TRUE)
+  cut <- dn[o][which(cumsum(dn[o]) / sum(dn) >= 0.99)[1]]
+  g[dn < cut, `:=`(lr = NA, z = NA, dd = NA, dd_z = NA)]
+  g })
+dens_c <- dens_on(params$grid_n)       # same grid as the averaged landscape: masks and A-vs-B statistics
+dens   <- dens_on(params$dens_grid_n)  # fine grid: drawing
+
+# C. kernel-smoothed selection field in each plane: weighted mean displacement at each grid point
+arrows <- rbindlist(lapply(seq_along(planes), function(i) {
+  a <- planes[[i]][1]; b <- planes[[i]][2]
+  step <- max(diff(rng0[, a]), diff(rng0[, b])) / params$arrow_per_axis
+  bw <- params$arrow_bw * step
+  qa <- quantile(S[, a], c(.01, .99)); qb <- quantile(S[, b], c(.01, .99))
+  g <- CJ(x = seq(qa[1], qa[2], by = step), y = seq(qb[1], qb[2], by = step))
+  r <- g[, {
+    w <- exp(-((S[, a] - x)^2 + (S[, b] - y)^2) / (2 * bw^2))
+    sw <- sum(w); sw2 <- sum(w^2)
+    ma <- sum(w * D[, a]) / sw; mb <- sum(w * D[, b]) / sw
+    va <- sum(w * (D[, a] - ma)^2) / sw; vb <- sum(w * (D[, b] - mb)^2) / sw
+    .(eff_n = sw^2 / sw2, dx = ma, dy = mb, se_x = sqrt(va * sw2) / sw, se_y = sqrt(vb * sw2) / sw)
+  }, by = .(x, y)]
+  r[, mag := sqrt(dx^2 + dy^2)]
+  # standardised strength: displacement in SDs of each PC among the random games' gen-5 choices (the mutation step scales with each PC's spread)
+  r[, mag_sd := sqrt((dx / sd(n5[[P[a]]]))^2 + (dy / sd(n5[[P[b]]]))^2)]
+  r[, se_mag := sqrt((dx * se_x)^2 + (dy * se_y)^2) / mag]
+  r[, clear := mag > 2 * se_mag]
+  r[, `:=`(plane = i, step = step, bw = bw)]
+  r[eff_n >= params$arrow_min_eff_n] }))
+fwrite(arrows, file.path(params$out_dir, "benchmark_arrow_field.csv"))
+cat(sprintf("arrow glyphs per plane: %s; clearly non-zero: %s\n",
+            paste(arrows[, .N, by = plane]$N, collapse = ", "),
+            paste(arrows[, sum(clear), by = plane]$V1, collapse = ", ")))
+
+# numeric agreement between rows A and B, within the unmasked region
+agree <- rbindlist(lapply(seq_along(planes), function(i) {
+  m <- merge(pd[[i]], dens_c[[i]], by = c("u", "v"))[!is.na(lr)]
+  data.table(plane = paste(P[planes[[i]]], collapse = "/"), cells = nrow(m),
+             r_landscape_vs_logratio = cor(m$fbar, m$lr, method = "spearman"),
+             cells_significant_pct = 100 * mean(abs(m$z) > params$z_crit)) }))
+knitr::kable(agree, digits = 3, caption = "Spearman correlation between the averaged landscape (row A) and the log density ratio (row B), over grid cells where the random games put vases")
+fwrite(agree, file.path(params$out_dir, "benchmark_agreement.csv"))
+```
+
+## Figure
+
+```{r figure, fig.width = 7.2, fig.height = 5.3}
+lims_p <- range(unlist(lapply(pd, function(g) p_beat(range(g$fbar)))))
+lr_max <- params$lr_cap   # interior-scaled; noisy rim cells would otherwise stretch the scale
+base <- function() list(coord_equal(expand = FALSE), theme_classic(base_size = 8))
+
+masked_pd <- function(i) {
+  g <- merge(copy(pd[[i]]), dens_c[[i]][, .(u, v, lr)], by = c("u", "v"))
+  g[, p := p_beat(fbar)][is.na(lr), p := NA]
+  g }
+row_a <- lapply(seq_along(planes), function(i) {
+  ttl <- if (i == 1) "A  Landscape, averaged over the other PCs" else NULL
+  g <- masked_pd(i)
+  ggplot(g, aes(u, v)) + geom_raster(aes(fill = p)) +
+    geom_contour(aes(z = p), breaks = seq(0.1, 0.9, 0.05), colour = "grey30", linewidth = 0.2) +
+    scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#B2182B", midpoint = 0.5, limits = lims_p,
+                         na.value = "grey85", name = "P(beats\nrandom)") +
+    labs(x = P[planes[[i]][1]], y = P[planes[[i]][2]], title = ttl) + base() })
+mag_lim <- c(0, max(arrows$mag_sd))
+row_b <- lapply(seq_along(planes), function(i) {
+  ttl <- if (i == 1) "B  Selected gen-5 vases, log(human / random), and direction of selection" else NULL
+  g <- dens[[i]]
+  ar <- arrows[plane == i][, `:=`(ux = dx / mag, uy = dy / mag)]
+  half <- params$arrow_len * ar$step[1] / 2
+  ggplot(g, aes(u, v)) + geom_raster(aes(fill = lr)) +
+    geom_contour(aes(z = abs(z)), breaks = params$z_crit, colour = "grey40", linewidth = 0.2) +
+    scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#B2182B", midpoint = 0,
+                         limits = c(-lr_max, lr_max), oob = scales::squish, na.value = "grey85",
+                         name = "log(human /\nrandom)") +
+    geom_segment(data = ar, aes(x = x - half * ux, y = y - half * uy, xend = x + half * ux, yend = y + half * uy,
+                                colour = mag_sd, alpha = clear),
+                 inherit.aes = FALSE, linewidth = 0.3,
+                 arrow = grid::arrow(length = grid::unit(0.6, "mm"), type = "closed", angle = 30)) +
+    scale_colour_gradient(low = "grey65", high = "black", limits = mag_lim, name = "displacement\n(SD of PC)") +
+    scale_alpha_manual(values = c(`FALSE` = 0.25, `TRUE` = 1), guide = "none") +
+    labs(x = P[planes[[i]][1]], y = P[planes[[i]][2]], title = ttl) + base() })
+
+fig <- (wrap_plots(row_a, nrow = 1) / wrap_plots(row_b, nrow = 1)) +
+  plot_layout(guides = "collect")
+print(fig)
+ggsave(file.path(params$out_dir, "figure_benchmark.pdf"), fig, width = 183, height = 135, units = "mm")
+ggsave(file.path(params$out_dir, "figure_benchmark.png"), fig, width = 183, height = 135, units = "mm", dpi = 200, bg = "white")
+```
+
+
+## SI figure: the raw density difference
+
+Human minus random density of the chosen generation-5 vases (per unit area, PC units²), same kernel estimates, mask and planes as row B. Unlike the log ratio, this weights selection by how many vases were in each region.
+
+```{r rawdiff, fig.width = 7.2, fig.height = 2.8}
+# each plane on its own colour scale: density per unit area differs between planes (see caption)
+row_d <- lapply(seq_along(planes), function(i) {
+  dd_max <- max(abs(quantile(dens[[i]]$dd, c(.005, .995), na.rm = TRUE)))
+  ggplot(dens[[i]], aes(u, v)) + geom_raster(aes(fill = dd)) +
+    geom_contour(aes(z = abs(dd_z)), breaks = params$z_crit, colour = "black", linewidth = 0.3) +
+    scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#B2182B", midpoint = 0,
+                         limits = c(-dd_max, dd_max), oob = scales::squish, na.value = "grey85",
+                         name = NULL) +
+    labs(x = P[planes[[i]][1]], y = P[planes[[i]][2]]) + base() +
+    theme(legend.position = "bottom", legend.key.width = grid::unit(8, "mm"), legend.key.height = grid::unit(2, "mm"),
+          legend.text = element_text(size = 5)) })
+fig_d <- wrap_plots(row_d, nrow = 1)
+print(fig_d)
+ggsave(file.path(params$out_dir, "figure_benchmark_rawdiff.pdf"), fig_d, width = 183, height = 80, units = "mm")
+ggsave(file.path(params$out_dir, "figure_benchmark_rawdiff.png"), fig_d, width = 183, height = 80, units = "mm", dpi = 200, bg = "white")
+agree_d <- rbindlist(lapply(seq_along(planes), function(i) {
+  m <- merge(pd[[i]], dens_c[[i]], by = c("u", "v"))[!is.na(dd)]
+  data.table(plane = paste(P[planes[[i]]], collapse = "/"),
+             r_landscape_vs_rawdiff = cor(m$fbar, m$dd, method = "spearman"),
+             r_logratio_vs_rawdiff = cor(m$lr, m$dd, method = "spearman"),
+             cells_significant_pct = 100 * mean(abs(m$dd_z) > params$z_crit)) }))
+knitr::kable(agree_d, digits = 3)
+fwrite(agree_d, file.path(params$out_dir, "benchmark_rawdiff_agreement.csv"))
+```
+
+```{r session}
+sessionInfo()
+```
