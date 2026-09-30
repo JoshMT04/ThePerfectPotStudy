@@ -20,3 +20,4 @@ feature_extraction/outdir/xgb_rank_items_within_round.csv
 feature_extraction/outdir/master_feature_matrix_compiled.parquet
 .tmp.driveupload
 random_figs/
+ai_beauty/
