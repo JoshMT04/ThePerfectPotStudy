@@ -7,11 +7,11 @@ derivative alignment, spatial Y-binning, and amplitude binning.
 
 import numpy as np
 
-from function_modules.srv_elastic_distance import extract_srv_distance
-from function_modules.spatial_error_and_flexibility import extract_spatial_error_and_flexibility
-from function_modules.derivatives_and_distributions import extract_derivative_alignment
-from function_modules.spatial_y_binning import extract_spatial_y_binning
-from function_modules.amplitude_binning import extract_amplitude_binning
+from feature_extraction.old.function_modules.srv_elastic_distance import extract_srv_distance
+from feature_extraction.old.function_modules.spatial_error_and_flexibility import extract_spatial_error_and_flexibility
+from feature_extraction.old.function_modules.derivatives_and_distributions import extract_derivative_alignment
+from feature_extraction.old.function_modules.spatial_y_binning import extract_spatial_y_binning
+from feature_extraction.old.function_modules.amplitude_binning import extract_amplitude_binning
 
 
 def compare_vase_to_target(y_coords, vase_x, target_x, target_name):

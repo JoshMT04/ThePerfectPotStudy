@@ -24,17 +24,17 @@ if not hasattr(np, 'trapz'):
 # -----------------------------------------
 # 1. IMPORT INTRINSIC MODULES
 # -----------------------------------------
-from function_modules.core_engine import compute_base_kinematics
-from function_modules.proportions_and_mass import extract_proportions_and_mass
-from function_modules.kinematics import extract_kinematics
-from function_modules.entropy_and_moments import extract_entropy_and_moments
-from function_modules.vertical_asymmetry_and_binning import extract_vertical_asymmetry_and_binning
-from function_modules.typological_skeleton import extract_typological_skeleton
+from feature_extraction.old.function_modules.core_engine import compute_base_kinematics
+from feature_extraction.old.function_modules.proportions_and_mass import extract_proportions_and_mass
+from feature_extraction.old.function_modules.kinematics import extract_kinematics
+from feature_extraction.old.function_modules.entropy_and_moments import extract_entropy_and_moments
+from feature_extraction.old.function_modules.vertical_asymmetry_and_binning import extract_vertical_asymmetry_and_binning
+from feature_extraction.old.function_modules.typological_skeleton import extract_typological_skeleton
 
 # -----------------------------------------
 # 2. IMPORT RELATIONAL MODULE
 # -----------------------------------------
-from function_modules.main_curve_matcher import compare_vase_to_target
+from feature_extraction.old.function_modules.main_curve_matcher import compare_vase_to_target
 
 # -----------------------------------------
 # UTILITY FUNCTIONS
